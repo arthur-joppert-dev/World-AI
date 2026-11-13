@@ -115,6 +115,8 @@
   align-items: center;
   gap: 46px;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 48px clamp(24px, 7vw, 78px);
   background:
     radial-gradient(ellipse at 9% 8%, #e8efff 0, transparent 37%),
@@ -310,6 +312,8 @@
   justify-items: center;
   gap: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 34px;
   color: #7b8ba5;
   text-align: center;
@@ -336,6 +340,8 @@
 
 .student-path-view {
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 26px clamp(17px, 4vw, 42px) 42px;
 }
 
@@ -585,6 +591,8 @@
   width: min(680px, 100%);
   align-self: center;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 23px 24px 33px;
 }
 

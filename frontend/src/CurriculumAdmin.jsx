@@ -146,6 +146,15 @@ function CurriculumAdmin({ onClose }) {
     }
   }
 
+  function selectClass(classId) {
+    setSelectedClassId(classId);
+    setLessons([]);
+    setStudents([]);
+    if (editingLessonId) resetEditor();
+    loadLessons(classId);
+    if (activeTab === "students") loadStudents(classId);
+  }
+
   async function createClass(event) {
     event.preventDefault();
     if (isCreatingClass) return;
@@ -468,15 +477,7 @@ function CurriculumAdmin({ onClose }) {
                   <select
                     id="curriculum-class"
                     value={selectedClassId}
-                    onChange={(event) => {
-                      const classId = event.target.value;
-                      setSelectedClassId(classId);
-                      setLessons([]);
-                      setStudents([]);
-                      if (editingLessonId) resetEditor();
-                      loadLessons(classId);
-                      if (activeTab === "students") loadStudents(classId);
-                    }}
+                    onChange={(event) => selectClass(event.target.value)}
                   >
                     {classes.map((item) => (
                       <option key={item.id} value={item.id}>
@@ -1006,11 +1007,25 @@ function CurriculumAdmin({ onClose }) {
                         <div>
                           <h3>Criar conta de aluno</h3>
                           <p>
-                            A conta será vinculada automaticamente à turma
-                            selecionada.
+                            Escolha a turma à qual esta conta de aluno será
+                            vinculada.
                           </p>
                         </div>
                       </div>
+                      <label className="curriculum-admin-field">
+                        Turma do aluno
+                        <select
+                          value={selectedClassId}
+                          onChange={(event) => selectClass(event.target.value)}
+                          required
+                        >
+                          {classes.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {classLabel(item) || `Turma ${item.id}`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <div className="curriculum-admin-fields">
                         <label>
                           Nome de usuário

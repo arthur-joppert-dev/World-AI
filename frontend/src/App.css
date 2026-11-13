@@ -1,5 +1,35 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
 
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  scrollbar-color: #b6c5df transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #b6c5df;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #8299c2;
+  background-clip: content-box;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -14,9 +44,9 @@
 }
 
 .sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  position: relative;
+  align-self: stretch;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   padding: 28px 18px 16px;
@@ -210,6 +240,8 @@
   width: min(100%, 520px);
   max-height: min(90vh, 760px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 25px;
   border: 1px solid rgba(220, 230, 247, 0.9);
   border-radius: 18px;
@@ -1858,6 +1890,20 @@ html[data-theme="dark"] .topbar {
   background: rgba(18, 25, 38, 0.94);
 }
 
+html[data-theme="dark"] * {
+  scrollbar-color: #50617f transparent;
+}
+
+html[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  background: #50617f;
+  background-clip: content-box;
+}
+
+html[data-theme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background: #7185aa;
+  background-clip: content-box;
+}
+
 html[data-theme="dark"] .brand,
 html[data-theme="dark"] .conversation-heading h1,
 html[data-theme="dark"] .panel-header h2,
@@ -2087,6 +2133,12 @@ html[data-theme="dark"] .error-banner button {
     min-height: 33px;
     padding: 0 10px;
     font-size: 10px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
   .game-open-button {
     min-height: 33px;

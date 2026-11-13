@@ -420,7 +420,9 @@ function StudentPortal({ onClose }) {
                             type="button"
                             key={`${selectedLesson.id}-${exerciseIndex}-${index}`}
                             onClick={() => setSelectedOption(index)}
-                            disabled={Boolean(answerFeedback?.correta)}
+                            disabled={
+                              isAnswering || Boolean(answerFeedback?.correta)
+                            }
                           >
                             <span className="student-answer-letter">
                               {String.fromCharCode(65 + index)}
@@ -462,6 +464,9 @@ function StudentPortal({ onClose }) {
                       <strong>
                         {answerFeedback.correta ? "Muito bem!" : "Quase lá!"}
                       </strong>
+                      {answerFeedback.feedback && (
+                        <span>{answerFeedback.feedback}</span>
+                      )}
                       {!answerFeedback.correta &&
                         selectedLesson.exercicios[exerciseIndex]?.tipo ===
                           "multiple_choice" && (

@@ -5,11 +5,11 @@ from functools import wraps
 from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request, session
-from groq import APIConnectionError, APITimeoutError, RateLimitError
+from groq import APIConnectionError, APITimeoutError, APIStatusError, RateLimitError
 from sqlalchemy import or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from backend.ai.ai import ask
+from backend.ai.ai import ask, grade_written_answer
 from backend import db
 from backend.models.models import (
     Atividade,
@@ -877,16 +877,34 @@ def answer_student_exercise(lesson_id):
         if type(answer) is not int or not 0 <= answer < len(options):
             return jsonify({"error": "Selecione uma opção válida"}), 400
         is_correct = answer == exercise.indice_correto
+        feedback = None
     else:
         answer = data.get("resposta")
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 500:
             return jsonify({"error": "Digite uma tradução com até 500 caracteres"}), 400
         accepted = accepted_translation_answers(exercise)
-        is_correct = any(
-            normalize_translation_answer(answer)
-            == normalize_translation_answer(expected)
-            for expected in accepted
-        )
+        try:
+            evaluation = grade_written_answer(
+                exercise.enunciado,
+                accepted,
+                answer.strip(),
+                lesson.idioma,
+            )
+        except RateLimitError:
+            return jsonify(
+                {"error": "A IA está temporariamente sobrecarregada. Tente novamente em alguns segundos."}
+            ), 429
+        except (APITimeoutError, APIConnectionError):
+            return jsonify(
+                {"error": "Não foi possível conectar à IA agora. Tente novamente."}
+            ), 503
+        except (APIStatusError, ValueError, TypeError, json.JSONDecodeError):
+            current_app.logger.exception("Falha ao avaliar resposta escrita do aluno")
+            return jsonify(
+                {"error": "Não foi possível avaliar sua resposta agora. Tente novamente."}
+            ), 502
+        is_correct = evaluation["correta"]
+        feedback = evaluation["feedback"]
 
     if progress is None:
         progress = ProgressoExercicio(
@@ -915,6 +933,7 @@ def answer_student_exercise(lesson_id):
     return jsonify(
         {
             "correta": is_correct,
+            "feedback": feedback,
             "tentativas": progress.tentativas,
             "indice_correto": exercise.indice_correto
             if exercise.tipo == "multiple_choice"

@@ -52,4 +52,6 @@ administrativa é protegida pela chave `ADMIN_API_KEY`.
 
 Para exercícios de tradução, o administrador pode cadastrar respostas aceitas
 alternativas, uma por linha (por exemplo, formas em romaji e em japonês). A
-correção ignora diferenças de maiúsculas, pontuação, espaços e acentos latinos.
+IA avalia se a resposta escrita tem o sentido correto, mesmo quando não é
+idêntica à resposta-modelo, e dá um feedback breve ao aluno. Se a IA estiver
+indisponível, a resposta não é registrada e o aluno pode tentar novamente.

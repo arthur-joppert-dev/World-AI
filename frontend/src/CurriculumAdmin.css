@@ -76,6 +76,8 @@
 
 .curriculum-admin-content {
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 20px 24px 24px;
 }
 
@@ -135,6 +137,8 @@
 .curriculum-admin-class-picker select,
 .curriculum-admin-class-form input,
 .curriculum-admin-class-form select,
+.curriculum-admin-student-form input:not([type="radio"]),
+.curriculum-admin-student-form select,
 .curriculum-admin-editor input:not([type="radio"]),
 .curriculum-admin-editor select,
 .curriculum-admin-editor textarea,
@@ -164,6 +168,8 @@
 .curriculum-admin-class-picker select:focus,
 .curriculum-admin-class-form input:focus,
 .curriculum-admin-class-form select:focus,
+.curriculum-admin-student-form input:focus,
+.curriculum-admin-student-form select:focus,
 .curriculum-admin-editor input:focus,
 .curriculum-admin-editor select:focus,
 .curriculum-admin-editor textarea:focus,
@@ -731,6 +737,8 @@ html[data-theme="dark"] .curriculum-admin-access input,
 html[data-theme="dark"] .curriculum-admin-class-picker select,
 html[data-theme="dark"] .curriculum-admin-class-form input,
 html[data-theme="dark"] .curriculum-admin-class-form select,
+html[data-theme="dark"] .curriculum-admin-student-form input:not([type="radio"]),
+html[data-theme="dark"] .curriculum-admin-student-form select,
 html[data-theme="dark"] .curriculum-admin-editor input:not([type="radio"]),
 html[data-theme="dark"] .curriculum-admin-editor select,
 html[data-theme="dark"] .curriculum-admin-editor textarea,
@@ -744,6 +752,7 @@ html[data-theme="dark"] .curriculum-admin-exercise textarea {
 
 html[data-theme="dark"] .curriculum-admin-access input::placeholder,
 html[data-theme="dark"] .curriculum-admin-class-form input::placeholder,
+html[data-theme="dark"] .curriculum-admin-student-form input::placeholder,
 html[data-theme="dark"] .curriculum-admin-editor input::placeholder,
 html[data-theme="dark"] .curriculum-admin-editor textarea::placeholder,
 html[data-theme="dark"] .curriculum-admin-exercise input::placeholder,
