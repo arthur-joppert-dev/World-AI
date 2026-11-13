@@ -4,7 +4,7 @@
 
 Pré-requisitos: Docker com o plugin Docker Compose.
 
-1. Copie `backend/.env.example` para `backend/.env` e informe sua chave `GROQ_API_KEY`.
+1. Copie `backend/.env.example` para `backend/.env` e informe sua chave `GROQ_API_KEY` e uma chave secreta em `ADMIN_API_KEY`.
 2. Na raiz do projeto, execute:
 
    ```sh
@@ -17,3 +17,39 @@ O Compose inicia o Vite em modo de desenvolvimento e a API Flask. O banco SQLite
 mantido em `instance/` no host, e o arquivo `backend/.env` é usado apenas para
 fornecer variáveis ao container, sem ser incluído na imagem. Para encerrar, use
 `docker compose down`.
+
+## Criar turmas
+
+1. No site, abra **Conteúdo** e informe a chave configurada como
+   `ADMIN_API_KEY`.
+2. Clique em **Criar turma**, escolha o idioma, o dia da semana e o horário.
+3. Clique em **Criar turma** para salvar. A turma ficará disponível para criar
+   lições e vincular contas de alunos.
+
+## Criar lições e exercícios
+
+1. Inicie o site e clique em **Conteúdo** no topo da página.
+2. Informe a chave definida em `ADMIN_API_KEY`.
+3. Escolha uma turma, um nível (A1 a C2) e o idioma da lição.
+4. Escreva o nome da lição e adicione exercícios de múltipla escolha ou tradução.
+   Na múltipla escolha, marque o círculo ao lado da resposta correta.
+5. Clique em **Criar lição**. As lições salvas aparecem ao lado do formulário
+   para edição ou exclusão.
+
+Os exercícios e as respostas corretas são guardados no banco SQLite; a área
+administrativa é protegida pela chave `ADMIN_API_KEY`.
+
+## Criar contas e praticar
+
+1. Abra **Conteúdo**, informe a chave administrativa e selecione a turma na aba
+   **Alunos**.
+2. Crie uma conta com nome de usuário, e-mail e senha de pelo menos 8 caracteres.
+   A conta fica vinculada à turma selecionada.
+3. O aluno acessa **Área do aluno** no topo da página e entra com o nome de
+   usuário ou e-mail e a senha cadastrada.
+4. As lições da turma aparecem na trilha por nível. Ao responder, o aluno recebe
+   feedback e ganha 10 XP por exercício concluído; o progresso é salvo no banco.
+
+Para exercícios de tradução, o administrador pode cadastrar respostas aceitas
+alternativas, uma por linha (por exemplo, formas em romaji e em japonês). A
+correção ignora diferenças de maiúsculas, pontuação, espaços e acentos latinos.

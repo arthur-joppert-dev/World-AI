@@ -1,5 +1,6 @@
 import json
 import secrets
+import unicodedata
 from functools import wraps
 from datetime import datetime, timezone
 
@@ -13,8 +14,11 @@ from backend import db
 from backend.models.models import (
     Atividade,
     EntregaAtividade,
+    ExercicioCurriculo,
     Jogo,
+    LicaoCurriculo,
     ParticipanteJogo,
+    ProgressoExercicio,
     Professor,
     QuestaoJogo,
     RespostaJogo,
@@ -59,6 +63,227 @@ def serialize_atividade(atividade, entrega=None):
 
 def serialize_professor(professor):
     return {"id": professor.id, "nome": professor.nome, "email": professor.email, "materia": professor.materia}
+
+
+def serialize_licao_curriculo(licao):
+    return {
+        "id": licao.id,
+        "turma_id": licao.turma_id,
+        "nivel": licao.nivel,
+        "idioma": licao.idioma,
+        "titulo": licao.titulo,
+        "descricao": licao.descricao,
+        "exercicios": [
+            {
+                "id": exercise.id,
+                "tipo": exercise.tipo,
+                "enunciado": exercise.enunciado,
+                "opcoes": json.loads(exercise.opcoes_json)
+                if exercise.opcoes_json
+                else [],
+                "indice_correto": exercise.indice_correto,
+                "respostas_aceitas": accepted_translation_answers(exercise),
+            }
+            for exercise in licao.exercicios
+        ],
+    }
+
+
+def accepted_translation_answers(exercise):
+    if not exercise.resposta_correta:
+        return []
+    try:
+        answers = json.loads(exercise.resposta_correta)
+    except (TypeError, json.JSONDecodeError):
+        return [exercise.resposta_correta]
+    if (
+        isinstance(answers, list)
+        and answers
+        and all(isinstance(answer, str) for answer in answers)
+    ):
+        return answers
+    return [exercise.resposta_correta]
+
+
+def normalize_translation_answer(answer):
+    decomposed = unicodedata.normalize("NFD", unicodedata.normalize("NFKC", answer).casefold())
+    normalized = []
+    previous_base = ""
+    for character in decomposed:
+        category = unicodedata.category(character)
+        if category == "Mn":
+            if "LATIN" not in unicodedata.name(previous_base, ""):
+                normalized.append(character)
+            continue
+        if category.startswith(("P", "Z", "S", "C")):
+            continue
+        normalized.append(character)
+        previous_base = character
+    return "".join(normalized)
+
+
+def serialize_student_lesson(lesson, user):
+    exercises = []
+    completed_count = 0
+    for exercise in lesson.exercicios:
+        progress = ProgressoExercicio.query.filter_by(
+            user_id=user.id,
+            exercicio_id=exercise.id,
+        ).first()
+        completed = bool(progress and progress.concluido)
+        completed_count += int(completed)
+        exercises.append(
+            {
+                "id": exercise.id,
+                "tipo": exercise.tipo,
+                "enunciado": exercise.enunciado,
+                "opcoes": json.loads(exercise.opcoes_json)
+                if exercise.opcoes_json
+                else [],
+                "concluido": completed,
+            }
+        )
+    return {
+        "id": lesson.id,
+        "nivel": lesson.nivel,
+        "idioma": lesson.idioma,
+        "titulo": lesson.titulo,
+        "descricao": lesson.descricao,
+        "total_exercicios": len(exercises),
+        "exercicios_concluidos": completed_count,
+        "concluida": bool(exercises) and completed_count == len(exercises),
+        "exercicios": exercises,
+    }
+
+
+def serialize_student_account(user):
+    turma = db.session.get(Turma, user.turma) if user.turma is not None else None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "turma_id": user.turma,
+        "turma": (
+            {
+                "id": turma.id,
+                "idioma": turma.idioma,
+                "dia": turma.dia,
+                "horario": turma.horario,
+            }
+            if turma
+            else None
+        ),
+    }
+
+
+def current_student():
+    user_id = session.get("user_id")
+    return db.session.get(User, user_id) if user_id is not None else None
+
+
+def validate_licao_data(data):
+    if not isinstance(data, dict):
+        return None, "Envie um corpo JSON válido"
+
+    turma_id = data.get("turma_id")
+    turma = db.session.get(Turma, turma_id) if type(turma_id) is int else None
+    if turma is None:
+        return None, "Selecione uma turma válida"
+
+    nivel = data.get("nivel")
+    if not isinstance(nivel, str) or nivel not in {"A1", "A2", "B1", "B2", "C1", "C2"}:
+        return None, "Selecione um nível entre A1 e C2"
+
+    idioma = data.get("idioma")
+    if not isinstance(idioma, str) or not idioma.strip() or len(idioma.strip()) > 40:
+        return None, "Selecione um idioma válido"
+
+    titulo = data.get("titulo")
+    if not isinstance(titulo, str) or not titulo.strip() or len(titulo.strip()) > 120:
+        return None, "O título da lição é obrigatório e deve ter até 120 caracteres"
+
+    descricao = data.get("descricao", "")
+    if not isinstance(descricao, str) or len(descricao.strip()) > 500:
+        return None, "A descrição deve ter até 500 caracteres"
+
+    exercises = data.get("exercicios")
+    if not isinstance(exercises, list) or not 1 <= len(exercises) <= 50:
+        return None, "Adicione entre 1 e 50 exercícios à lição"
+
+    validated_exercises = []
+    for position, exercise in enumerate(exercises, start=1):
+        if not isinstance(exercise, dict):
+            return None, f"Exercício {position} inválido"
+        kind = exercise.get("tipo")
+        prompt = exercise.get("enunciado")
+        if not isinstance(kind, str) or kind not in {"multiple_choice", "translation"}:
+            return None, f"Escolha um tipo válido para o exercício {position}"
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt.strip()) > 500:
+            return None, f"O enunciado do exercício {position} é obrigatório (até 500 caracteres)"
+
+        if kind == "multiple_choice":
+            options = exercise.get("opcoes")
+            correct_index = exercise.get("indice_correto")
+            if not isinstance(options, list) or not 2 <= len(options) <= 6 or any(
+                not isinstance(option, str)
+                or not option.strip()
+                or len(option.strip()) > 160
+                for option in options
+            ):
+                return None, f"Informe de 2 a 6 opções válidas no exercício {position}"
+            if type(correct_index) is not int or not 0 <= correct_index < len(options):
+                return None, f"Marque a resposta correta no exercício {position}"
+            validated_exercises.append(
+                {
+                    "tipo": kind,
+                    "enunciado": prompt.strip(),
+                    "opcoes": [option.strip() for option in options],
+                    "indice_correto": correct_index,
+                    "resposta_correta": None,
+                }
+            )
+        else:
+            answers = exercise.get("respostas_aceitas")
+            if answers is None:
+                answers = [exercise.get("resposta_correta")]
+            if (
+                not isinstance(answers, list)
+                or not 1 <= len(answers) <= 8
+                or any(
+                    not isinstance(answer, str)
+                    or not answer.strip()
+                    or len(answer.strip()) > 500
+                    for answer in answers
+                )
+            ):
+                return None, f"Informe de 1 a 8 respostas aceitas para a tradução {position} (até 500 caracteres cada)"
+            unique_answers = list(
+                dict.fromkeys(
+                    answer.strip()
+                    for answer in answers
+                    if normalize_translation_answer(answer)
+                )
+            )
+            if not unique_answers:
+                return None, f"Informe uma tradução válida para o exercício {position}"
+            validated_exercises.append(
+                {
+                    "tipo": kind,
+                    "enunciado": prompt.strip(),
+                    "opcoes": None,
+                    "indice_correto": None,
+                    "resposta_correta": unique_answers,
+                }
+            )
+
+    return {
+        "turma": turma,
+        "nivel": nivel,
+        "idioma": idioma.strip(),
+        "titulo": titulo.strip(),
+        "descricao": descricao.strip(),
+        "exercicios": validated_exercises,
+    }, None
 
 
 def serialize_jogo(jogo, participante=None):
@@ -313,9 +538,23 @@ def answer_game_question(pin):
     }), 200
 
 
-@bp.route("/admin/turmas", methods=["POST"])
+@bp.route("/admin/turmas", methods=["GET", "POST"])
 @require_admin
 def create_turma():
+    if request.method == "GET":
+        classes = Turma.query.order_by(Turma.id).all()
+        return jsonify(
+            [
+                {
+                    "id": item.id,
+                    "idioma": item.idioma,
+                    "horario": item.horario,
+                    "dia": item.dia,
+                }
+                for item in classes
+            ]
+        ), 200
+
     data = get_json_object()
     fields = ("idioma", "horario", "dia")
     if not data or any(not isinstance(data.get(field), str) or not data[field].strip() for field in fields):
@@ -331,6 +570,99 @@ def create_turma():
     db.session.add(turma)
     db.session.commit()
     return jsonify({"id": turma.id, "idioma": turma.idioma, "horario": turma.horario, "dia": turma.dia}), 201
+
+
+@bp.route("/admin/curriculo/licoes", methods=["GET", "POST"])
+@require_admin
+def manage_curriculum_lessons():
+    if request.method == "GET":
+        class_id = request.args.get("turma_id")
+        query = LicaoCurriculo.query.order_by(
+            LicaoCurriculo.nivel,
+            LicaoCurriculo.criada_em,
+            LicaoCurriculo.id,
+        )
+        if class_id is not None:
+            if not class_id.isdigit():
+                return jsonify({"error": "turma_id inválido"}), 400
+            query = query.filter_by(turma_id=int(class_id))
+        return jsonify(
+            [serialize_licao_curriculo(lesson) for lesson in query.all()]
+        ), 200
+
+    payload, error_message = validate_licao_data(get_json_object())
+    if error_message:
+        return jsonify({"error": error_message}), 400
+
+    lesson = LicaoCurriculo(
+        turma=payload["turma"],
+        nivel=payload["nivel"],
+        idioma=payload["idioma"],
+        titulo=payload["titulo"],
+        descricao=payload["descricao"],
+        exercicios=[
+            ExercicioCurriculo(
+                posicao=position,
+                tipo=exercise["tipo"],
+                enunciado=exercise["enunciado"],
+                opcoes_json=json.dumps(exercise["opcoes"], ensure_ascii=False)
+                if exercise["opcoes"] is not None
+                else None,
+                indice_correto=exercise["indice_correto"],
+                resposta_correta=json.dumps(
+                    exercise["resposta_correta"], ensure_ascii=False
+                )
+                if exercise["resposta_correta"] is not None
+                else None,
+            )
+            for position, exercise in enumerate(payload["exercicios"])
+        ],
+    )
+    db.session.add(lesson)
+    db.session.commit()
+    return jsonify(serialize_licao_curriculo(lesson)), 201
+
+
+@bp.route("/admin/curriculo/licoes/<int:lesson_id>", methods=["PUT", "DELETE"])
+@require_admin
+def manage_curriculum_lesson(lesson_id):
+    lesson = db.session.get(LicaoCurriculo, lesson_id)
+    if lesson is None:
+        return jsonify({"error": "Lição não encontrada"}), 404
+
+    if request.method == "DELETE":
+        db.session.delete(lesson)
+        db.session.commit()
+        return jsonify({"message": "Lição excluída"}), 200
+
+    payload, error_message = validate_licao_data(get_json_object())
+    if error_message:
+        return jsonify({"error": error_message}), 400
+
+    lesson.turma = payload["turma"]
+    lesson.nivel = payload["nivel"]
+    lesson.idioma = payload["idioma"]
+    lesson.titulo = payload["titulo"]
+    lesson.descricao = payload["descricao"]
+    lesson.exercicios = [
+        ExercicioCurriculo(
+            posicao=position,
+            tipo=exercise["tipo"],
+            enunciado=exercise["enunciado"],
+            opcoes_json=json.dumps(exercise["opcoes"], ensure_ascii=False)
+            if exercise["opcoes"] is not None
+            else None,
+            indice_correto=exercise["indice_correto"],
+            resposta_correta=json.dumps(
+                exercise["resposta_correta"], ensure_ascii=False
+            )
+            if exercise["resposta_correta"] is not None
+            else None,
+        )
+        for position, exercise in enumerate(payload["exercicios"])
+    ]
+    db.session.commit()
+    return jsonify(serialize_licao_curriculo(lesson)), 200
 
 
 @bp.route("/admin/turmas/<int:turma_id>", methods=["DELETE"])
@@ -374,9 +706,28 @@ def manage_turma_aluno(turma_id):
     return jsonify({"message": message, "user_id": user.id, "turma_id": user.turma}), 200
 
 
-@bp.route("/admin/usuarios", methods=["POST"])
+@bp.route("/admin/usuarios", methods=["GET", "POST"])
 @require_admin
-def create_user():
+def manage_users():
+    if request.method == "GET":
+        class_id = request.args.get("turma_id")
+        query = User.query.order_by(User.username)
+        if class_id is not None:
+            if not class_id.isdigit():
+                return jsonify({"error": "turma_id inválido"}), 400
+            query = query.filter_by(turma=int(class_id))
+        return jsonify(
+            [
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "turma_id": user.turma,
+                }
+                for user in query.all()
+            ]
+        ), 200
+
     data = get_json_object()
     required = ("username", "email", "password")
     if not data or any(not isinstance(data.get(field), str) or not data[field].strip() for field in required):
@@ -414,6 +765,7 @@ def create_user():
     return jsonify({"id": user.id, "username": user.username, "email": user.email}), 201
 
 
+@bp.route("/student/login", methods=["POST"])
 @bp.route("/login", methods=["POST"])
 def login():
     data = get_json_object()
@@ -435,13 +787,147 @@ def login():
 
     session.clear()
     session["user_id"] = user.id
-    return jsonify({"message": "Login realizado", "user": {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "idioma": user.idioma,
-        "turma_id": user.turma,
-    }}), 200
+    return jsonify(
+        {"message": "Login realizado", "user": serialize_student_account(user)}
+    ), 200
+
+
+@bp.route("/student/me", methods=["GET"])
+def student_me():
+    user = current_student()
+    if user is None:
+        return jsonify({"error": "Faça login para continuar"}), 401
+    return jsonify(serialize_student_account(user)), 200
+
+
+@bp.route("/student/logout", methods=["POST"])
+def student_logout():
+    session.clear()
+    return jsonify({"message": "Sessão encerrada"}), 200
+
+
+@bp.route("/student/lessons", methods=["GET"])
+def student_lessons():
+    user = current_student()
+    if user is None:
+        return jsonify({"error": "Faça login para continuar"}), 401
+    if user.turma is None:
+        return jsonify({"error": "Sua conta ainda não está vinculada a uma turma. Fale com o administrador."}), 409
+
+    lessons = (
+        LicaoCurriculo.query.filter_by(turma_id=user.turma)
+        .order_by(LicaoCurriculo.nivel, LicaoCurriculo.id)
+        .all()
+    )
+    serialized = [serialize_student_lesson(lesson, user) for lesson in lessons]
+    return jsonify(
+        {
+            "turma_id": user.turma,
+            "licoes": serialized,
+            "licoes_concluidas": sum(lesson["concluida"] for lesson in serialized),
+            "xp": sum(lesson["exercicios_concluidos"] for lesson in serialized) * 10,
+        }
+    ), 200
+
+
+@bp.route("/student/lessons/<int:lesson_id>", methods=["GET"])
+def student_lesson_detail(lesson_id):
+    user = current_student()
+    if user is None:
+        return jsonify({"error": "Faça login para continuar"}), 401
+    lesson = db.session.get(LicaoCurriculo, lesson_id)
+    if lesson is None or lesson.turma_id != user.turma:
+        return jsonify({"error": "Lição não encontrada para sua turma"}), 404
+    return jsonify(serialize_student_lesson(lesson, user)), 200
+
+
+@bp.route("/student/lessons/<int:lesson_id>/answer", methods=["POST"])
+def answer_student_exercise(lesson_id):
+    user = current_student()
+    if user is None:
+        return jsonify({"error": "Faça login para continuar"}), 401
+    lesson = db.session.get(LicaoCurriculo, lesson_id)
+    if lesson is None or lesson.turma_id != user.turma:
+        return jsonify({"error": "Lição não encontrada para sua turma"}), 404
+
+    data = get_json_object()
+    exercise_id = data.get("exercicio_id") if data else None
+    exercise = db.session.get(ExercicioCurriculo, exercise_id) if type(exercise_id) is int else None
+    if exercise is None or exercise.licao_id != lesson.id:
+        return jsonify({"error": "Exercício não encontrado nesta lição"}), 404
+
+    progress = ProgressoExercicio.query.filter_by(
+        user_id=user.id,
+        exercicio_id=exercise.id,
+    ).first()
+    if progress is not None and progress.concluido:
+        return jsonify(
+            {
+                "correta": True,
+                "ja_concluida": True,
+                "tentativas": progress.tentativas,
+                "resposta_correta": exercise.indice_correto,
+                "respostas_aceitas": accepted_translation_answers(exercise),
+            }
+        ), 200
+
+    if exercise.tipo == "multiple_choice":
+        answer = data.get("indice_escolhido")
+        options = json.loads(exercise.opcoes_json or "[]")
+        if type(answer) is not int or not 0 <= answer < len(options):
+            return jsonify({"error": "Selecione uma opção válida"}), 400
+        is_correct = answer == exercise.indice_correto
+    else:
+        answer = data.get("resposta")
+        if not isinstance(answer, str) or not answer.strip() or len(answer) > 500:
+            return jsonify({"error": "Digite uma tradução com até 500 caracteres"}), 400
+        accepted = accepted_translation_answers(exercise)
+        is_correct = any(
+            normalize_translation_answer(answer)
+            == normalize_translation_answer(expected)
+            for expected in accepted
+        )
+
+    if progress is None:
+        progress = ProgressoExercicio(
+            user_id=user.id,
+            exercicio_id=exercise.id,
+            tentativas=0,
+            concluido=False,
+        )
+        db.session.add(progress)
+    progress.tentativas += 1
+    progress.concluido = is_correct
+    progress.respondido_em = datetime.utcnow()
+    db.session.commit()
+
+    lesson_exercise_ids = [item.id for item in lesson.exercicios]
+    completed_count = ProgressoExercicio.query.filter(
+        ProgressoExercicio.user_id == user.id,
+        ProgressoExercicio.exercicio_id.in_(lesson_exercise_ids),
+        ProgressoExercicio.concluido.is_(True),
+    ).count()
+    total_completed = ProgressoExercicio.query.filter_by(
+        user_id=user.id,
+        concluido=True,
+    ).count()
+
+    return jsonify(
+        {
+            "correta": is_correct,
+            "tentativas": progress.tentativas,
+            "indice_correto": exercise.indice_correto
+            if exercise.tipo == "multiple_choice"
+            else None,
+            "respostas_aceitas": accepted_translation_answers(exercise)
+            if exercise.tipo == "translation"
+            else [],
+            "exercicios_concluidos": completed_count,
+            "total_exercicios": len(lesson_exercise_ids),
+            "licao_concluida": completed_count == len(lesson_exercise_ids),
+            "xp": total_completed * 10,
+        }
+    ), 200
 
 
 @bp.route("/admin/professores", methods=["GET", "POST"])

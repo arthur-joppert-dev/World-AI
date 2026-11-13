@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
+import CurriculumAdmin from "./CurriculumAdmin";
 import GameHub from "./GameHub";
+import StudentPortal from "./StudentPortal";
 
 const LANGUAGES = [
   { label: "English", flag: "🇬🇧" },
@@ -124,6 +126,9 @@ function isSecureOrigin() {
 }
 
 function App() {
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => getStorageValue("world-theme", "light") === "dark",
+  );
   const [language, setLanguage] = useState(
     () => getStorageValue("lingua-language", "English") || "English",
   );
@@ -137,6 +142,8 @@ function App() {
   const [feedbackLoadingId, setFeedbackLoadingId] = useState(null);
   const [isTranslatorOpen, setIsTranslatorOpen] = useState(false);
   const [isGameOpen, setIsGameOpen] = useState(false);
+  const [isCurriculumAdminOpen, setIsCurriculumAdminOpen] = useState(false);
+  const [isStudentPortalOpen, setIsStudentPortalOpen] = useState(false);
   const [translatorDirection, setTranslatorDirection] =
     useState("pt-to-language");
   const [translatorText, setTranslatorText] = useState("");
@@ -197,6 +204,12 @@ function App() {
   useEffect(() => {
     setStorageValue("world-voice-speed", String(voiceSpeed));
   }, [voiceSpeed]);
+
+  useEffect(() => {
+    const theme = isDarkMode ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+    setStorageValue("world-theme", theme);
+  }, [isDarkMode]);
 
   useEffect(() => {
     setStorageValue("lingua-conversation", JSON.stringify(messages));
@@ -683,9 +696,14 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <a className="brand" href="#top" aria-label="World, início">
-          <span className="brand-mark">
-            W<span>·</span>
-          </span>
+          <img
+            className="brand-logo"
+            src="/logo.png"
+            alt=""
+            onError={(event) => {
+              event.currentTarget.hidden = true;
+            }}
+          />
           <span>
             World<span className="brand-period">.</span>
           </span>
@@ -732,9 +750,14 @@ function App() {
       <section className="workspace" id="top">
         <header className="topbar">
           <div className="mobile-brand">
-            <span className="brand-mark">
-              W<span>·</span>
-            </span>{" "}
+            <img
+              className="brand-logo"
+              src="/logo.png"
+              alt=""
+              onError={(event) => {
+                event.currentTarget.hidden = true;
+              }}
+            />{" "}
             World<span className="brand-period">.</span>
           </div>
           <div className="session-title">
@@ -745,11 +768,44 @@ function App() {
             <span>Seu espaço de prática</span>
           </div>
           <button
+            className="student-portal-open-button"
+            type="button"
+            onClick={() => setIsStudentPortalOpen(true)}
+            aria-label="Abrir área do aluno"
+            title="Área do aluno"
+          >
+            <span aria-hidden="true">👤</span>
+            <span className="student-portal-open-label">Área do aluno</span>
+          </button>
+          <button
+            className="admin-open-button"
+            type="button"
+            onClick={() => setIsCurriculumAdminOpen(true)}
+            aria-label="Abrir área do administrador para criar lições"
+            title="Criar lições e exercícios"
+          >
+            <span aria-hidden="true">✎</span>
+            <span className="admin-open-label">Conteúdo</span>
+          </button>
+          <button
+            className="theme-toggle-button"
+            type="button"
+            onClick={() => setIsDarkMode((current) => !current)}
+            aria-label={isDarkMode ? "Ativar modo claro" : "Ativar modo escuro"}
+            aria-pressed={isDarkMode}
+            title={isDarkMode ? "Ativar modo claro" : "Ativar modo escuro"}
+          >
+            <span aria-hidden="true">{isDarkMode ? "☀" : "☾"}</span>
+          </button>
+          <button
             className="game-open-button"
             type="button"
             onClick={() => setIsGameOpen(true)}
+            aria-label="Abrir jogo ao vivo"
+            title="Jogo ao vivo"
           >
-            <span aria-hidden="true">✦</span> Jogo ao vivo
+            <span aria-hidden="true">✦</span>
+            <span className="game-open-label">Jogo ao vivo</span>
           </button>
           <button
             className="translator-open-button"
@@ -758,7 +814,10 @@ function App() {
             aria-label={`Traduzir do português para ${language}`}
             title={`Traduzir do português para ${language}`}
           >
-            <span aria-hidden="true">文</span> Português → {language}
+            <span aria-hidden="true">文</span>
+            <span className="translator-open-label">
+              Português → {language}
+            </span>
           </button>
         </header>
 
@@ -768,6 +827,14 @@ function App() {
             language={language}
             level={level}
           />
+        )}
+
+        {isCurriculumAdminOpen && (
+          <CurriculumAdmin onClose={() => setIsCurriculumAdminOpen(false)} />
+        )}
+
+        {isStudentPortalOpen && (
+          <StudentPortal onClose={() => setIsStudentPortalOpen(false)} />
         )}
 
         {isTranslatorOpen && (

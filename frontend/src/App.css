@@ -36,6 +36,13 @@
     sans-serif;
   letter-spacing: -1.2px;
 }
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  width: 29px;
+  height: 29px;
+  object-fit: contain;
+}
 .brand-mark {
   display: grid;
   place-items: center;
@@ -529,6 +536,93 @@
   gap: 7px;
   color: #9ba59f;
   font-size: 10px;
+}
+.admin-open-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #d5e0f1;
+  border-radius: 10px;
+  color: #38558f;
+  background: #f7f9ff;
+  font:
+    600 10px "DM Sans",
+    sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+.student-portal-open-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #d5e0f1;
+  border-radius: 10px;
+  color: #fff;
+  background: #355fc8;
+  font:
+    600 10px "DM Sans",
+    sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+.student-portal-open-button:hover {
+  transform: translateY(-1px);
+  border-color: #244eaf;
+  background: #244eaf;
+}
+.student-portal-open-button > span:first-child {
+  font-size: 15px;
+}
+.admin-open-button:hover {
+  transform: translateY(-1px);
+  border-color: #b7c8e8;
+  background: #edf2ff;
+}
+.admin-open-button > span:first-child {
+  font-size: 16px;
+}
+.theme-toggle-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #dfe7f3;
+  border-radius: 10px;
+  color: #38527d;
+  background: #fff;
+  font-size: 19px;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+.theme-toggle-button:hover {
+  transform: translateY(-1px);
+  border-color: #b7c8e8;
+  background: #f2f6ff;
+}
+.theme-toggle-button:focus-visible {
+  outline: 3px solid rgba(83, 123, 214, 0.3);
+  outline-offset: 2px;
 }
 .streak-icon {
   color: #a5b66d;
@@ -1475,10 +1569,9 @@ h2 {
       sans-serif;
     letter-spacing: -0.8px;
   }
-  .mobile-brand .brand-mark {
+  .mobile-brand .brand-logo {
     width: 24px;
     height: 24px;
-    font-size: 18px;
   }
   .session-title {
     margin-left: auto;
@@ -1707,6 +1800,289 @@ h2 {
   .session-title {
     display: none;
   }
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body {
+  color: #e4e9f4;
+  background: #101521;
+}
+
+html[data-theme="dark"] .app-shell {
+  color: #e4e9f4;
+  background: #101521;
+}
+
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .translator-dialog,
+html[data-theme="dark"] .message-bubble,
+html[data-theme="dark"] .typing-bubble,
+html[data-theme="dark"] .suggestion-chip,
+html[data-theme="dark"] .composer,
+html[data-theme="dark"] .learning-panel,
+html[data-theme="dark"] .select-wrap {
+  border-color: #2a3448;
+  background: #171f2e;
+}
+
+html[data-theme="dark"] .sidebar-tip {
+  background: #202b3d;
+}
+
+html[data-theme="dark"] .sidebar-tip p,
+html[data-theme="dark"] .profile-copy span,
+html[data-theme="dark"] .profile-menu {
+  color: #93a2bb;
+}
+
+html[data-theme="dark"] .sidebar-tip strong,
+html[data-theme="dark"] .profile-copy strong {
+  color: #d3dced;
+}
+
+html[data-theme="dark"] .profile-card {
+  border-color: #293346;
+}
+
+html[data-theme="dark"] .profile-avatar,
+html[data-theme="dark"] .user-avatar {
+  color: #d6e2fc;
+  background: #2a3958;
+}
+
+html[data-theme="dark"] .topbar {
+  border-color: #293346;
+  background: rgba(18, 25, 38, 0.94);
+}
+
+html[data-theme="dark"] .brand,
+html[data-theme="dark"] .conversation-heading h1,
+html[data-theme="dark"] .panel-header h2,
+html[data-theme="dark"] .translator-dialog-header h2 {
+  color: #edf2fb;
+}
+
+html[data-theme="dark"] .brand-period,
+html[data-theme="dark"] .heading-dot {
+  color: #8eacff;
+}
+
+html[data-theme="dark"] .new-chat-button,
+html[data-theme="dark"] .translator-open-button,
+html[data-theme="dark"] .admin-open-button,
+html[data-theme="dark"] .student-portal-open-button,
+html[data-theme="dark"] .theme-toggle-button,
+html[data-theme="dark"] .game-close,
+html[data-theme="dark"] .translator-close-button {
+  border-color: #35425a;
+  color: #d3def3;
+  background: #202a3b;
+}
+
+html[data-theme="dark"] .new-chat-button:hover,
+html[data-theme="dark"] .translator-open-button:hover,
+html[data-theme="dark"] .admin-open-button:hover,
+html[data-theme="dark"] .student-portal-open-button:hover,
+html[data-theme="dark"] .theme-toggle-button:hover,
+html[data-theme="dark"] .game-close:hover,
+html[data-theme="dark"] .translator-close-button:hover {
+  border-color: #50658e;
+  color: #f0f4ff;
+  background: #29364b;
+}
+
+html[data-theme="dark"] .shortcut,
+html[data-theme="dark"] .session-card,
+html[data-theme="dark"] .message-row.user .message-bubble,
+html[data-theme="dark"] .voice-button,
+html[data-theme="dark"] .voice-toggle,
+html[data-theme="dark"] .translator-direction-select,
+html[data-theme="dark"] .translator-dialog textarea {
+  border-color: #34415a;
+  color: #d5def0;
+  background: #202a3b;
+}
+
+html[data-theme="dark"] .session-card strong,
+html[data-theme="dark"] .message-author,
+html[data-theme="dark"] .message-bubble,
+html[data-theme="dark"] .suggestion-chip,
+html[data-theme="dark"] .composer textarea,
+html[data-theme="dark"] .setting-label,
+html[data-theme="dark"] .select-wrap select,
+html[data-theme="dark"] .level-text strong,
+html[data-theme="dark"] .translator-dialog form label,
+html[data-theme="dark"] .translator-result p {
+  color: #d3dced;
+}
+
+html[data-theme="dark"] .conversation-heading p,
+html[data-theme="dark"] .conversation-status,
+html[data-theme="dark"] .session-title,
+html[data-theme="dark"] .session-card small,
+html[data-theme="dark"] .message-author span,
+html[data-theme="dark"] .message-tools,
+html[data-theme="dark"] .message-tools span,
+html[data-theme="dark"] .composer-hint,
+html[data-theme="dark"] .character-count,
+html[data-theme="dark"] .privacy-note,
+html[data-theme="dark"] .level-text small,
+html[data-theme="dark"] .panel-footer,
+html[data-theme="dark"] .translator-result span,
+html[data-theme="dark"] .translator-dialog textarea::placeholder,
+html[data-theme="dark"] .composer textarea::placeholder {
+  color: #8997ae;
+}
+
+html[data-theme="dark"] .conversation-heading,
+html[data-theme="dark"] .panel-header,
+html[data-theme="dark"] .setting-block {
+  border-color: #293346;
+}
+
+html[data-theme="dark"] .sidebar-section-label,
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .suggestions-label {
+  color: #9baed4;
+}
+
+html[data-theme="dark"] .suggestion-chip:hover:not(:disabled),
+html[data-theme="dark"] .level-option:hover {
+  border-color: #405272;
+  color: #e0e9fb;
+  background: #202b3d;
+}
+
+html[data-theme="dark"] .message-tools button,
+html[data-theme="dark"] .translation-box,
+html[data-theme="dark"] .message-feedback-box {
+  border-color: #3a4b70;
+  color: #cbd9f7;
+  background: #202b43;
+}
+
+html[data-theme="dark"] .translation-box span,
+html[data-theme="dark"] .message-feedback-box span {
+  color: #9cb6f4;
+}
+
+html[data-theme="dark"] .message-tools button:hover:not(:disabled) {
+  border-color: #5d77b1;
+  background: #2a3958;
+}
+
+html[data-theme="dark"] .message-tools button:disabled {
+  color: #8795b2;
+  background: #20283a;
+}
+
+html[data-theme="dark"] .composer:focus-within {
+  border-color: #657fad;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.2),
+    0 0 0 3px rgba(101, 127, 173, 0.14);
+}
+
+html[data-theme="dark"] .voice-button.active,
+html[data-theme="dark"] .voice-toggle.on {
+  border-color: #5174ca;
+  color: #e8efff;
+  background: #2a3e6b;
+}
+
+html[data-theme="dark"] .level-option.selected {
+  border-color: #3c5749;
+  background: #1d302b;
+}
+
+html[data-theme="dark"] .level-code {
+  color: #a4b69c;
+  background: #29352e;
+}
+
+html[data-theme="dark"] .selected .level-code,
+html[data-theme="dark"] .setting-icon {
+  color: #b9d1be;
+  background: #2a4035;
+}
+
+html[data-theme="dark"] .info-dot,
+html[data-theme="dark"] .radio-mark {
+  border-color: #526250;
+  color: #a5b59c;
+}
+
+html[data-theme="dark"] .coach-card {
+  border-color: #384333;
+  background: #202a24;
+}
+
+html[data-theme="dark"] .coach-card strong {
+  color: #c2d0a6;
+}
+
+html[data-theme="dark"] .coach-card p {
+  color: #9ba88f;
+}
+
+html[data-theme="dark"] .translator-result {
+  border-color: #34415a;
+  background: #202a3b;
+}
+
+html[data-theme="dark"] .error-banner {
+  border-color: #68484b;
+  color: #ffd5d1;
+  background: #352528;
+}
+
+html[data-theme="dark"] .error-banner button {
+  color: #e5a9a2;
+}
+
+@media (max-width: 600px) {
+  .theme-toggle-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .admin-open-button {
+    width: 34px;
+    min-height: 34px;
+    padding: 0;
+  }
+
+  .student-portal-open-button {
+    width: 34px;
+    min-height: 34px;
+    padding: 0;
+  }
+
+  .student-portal-open-label {
+    display: none;
+  }
+
+  .admin-open-label {
+    display: none;
+  }
+
+  .game-open-button,
+  .translator-open-button {
+    width: 34px;
+    min-height: 34px;
+    padding: 0;
+  }
+
+  .game-open-label,
+  .translator-open-label {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
   .translator-open-button {
     min-height: 33px;
     padding: 0 10px;

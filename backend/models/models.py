@@ -9,6 +9,11 @@ class User(db.Model):
     password = db.Column(db.String(120), nullable=False)
     turma = db.Column(db.Integer, nullable=True)
     idioma = db.Column(db.String(20), nullable=True)
+    progresso_exercicios = db.relationship(
+        "ProgressoExercicio",
+        backref="aluno",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -60,6 +65,66 @@ class EntregaAtividade(db.Model):
     __table_args__ = (db.UniqueConstraint("atividade_id", "user_id", name="uq_atividade_aluno"),)
     atividade = db.relationship("Atividade", backref=db.backref("entregas", cascade="all, delete-orphan"))
     aluno = db.relationship("User", backref="entregas_atividade")
+
+
+class LicaoCurriculo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    turma_id = db.Column(db.Integer, db.ForeignKey("turma.id"), nullable=False, index=True)
+    nivel = db.Column(db.String(2), nullable=False, index=True)
+    idioma = db.Column(db.String(40), nullable=False)
+    titulo = db.Column(db.String(120), nullable=False)
+    descricao = db.Column(db.String(500), nullable=False, default="")
+    criada_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    turma = db.relationship(
+        "Turma",
+        backref=db.backref("licoes_curriculo", cascade="all, delete-orphan"),
+    )
+    exercicios = db.relationship(
+        "ExercicioCurriculo",
+        backref="licao",
+        cascade="all, delete-orphan",
+        order_by="ExercicioCurriculo.posicao",
+    )
+
+
+class ExercicioCurriculo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    licao_id = db.Column(
+        db.Integer,
+        db.ForeignKey("licao_curriculo.id"),
+        nullable=False,
+        index=True,
+    )
+    posicao = db.Column(db.Integer, nullable=False)
+    tipo = db.Column(db.String(24), nullable=False)
+    enunciado = db.Column(db.String(500), nullable=False)
+    opcoes_json = db.Column(db.Text, nullable=True)
+    indice_correto = db.Column(db.Integer, nullable=True)
+    resposta_correta = db.Column(db.String(500), nullable=True)
+    progresso_alunos = db.relationship(
+        "ProgressoExercicio",
+        backref="exercicio",
+        cascade="all, delete-orphan",
+    )
+
+
+class ProgressoExercicio(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    exercicio_id = db.Column(
+        db.Integer,
+        db.ForeignKey("exercicio_curriculo.id"),
+        nullable=False,
+        index=True,
+    )
+    tentativas = db.Column(db.Integer, nullable=False, default=0)
+    concluido = db.Column(db.Boolean, nullable=False, default=False)
+    respondido_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "exercicio_id", name="uq_progresso_aluno_exercicio"),
+    )
 
 
 class Jogo(db.Model):

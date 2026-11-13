@@ -594,3 +594,172 @@
     font-size: 18px;
   }
 }
+
+html[data-theme="dark"] .game-dialog {
+  border-color: #34415a;
+  color: #e0e8f7;
+  background: #171f2e;
+}
+
+html[data-theme="dark"] .game-dialog-header {
+  border-color: #2b3549;
+}
+
+html[data-theme="dark"] .game-heading h2,
+html[data-theme="dark"] .game-questions-heading h3,
+html[data-theme="dark"] .game-ranking h3,
+html[data-theme="dark"] .game-finished h3 {
+  color: #edf2fb;
+}
+
+html[data-theme="dark"] .game-heading > span,
+html[data-theme="dark"] .game-home > p,
+html[data-theme="dark"] .game-join-form > p,
+html[data-theme="dark"] .game-mode-grid small,
+html[data-theme="dark"] .game-ai-generator > small,
+html[data-theme="dark"] .game-questions-heading span,
+html[data-theme="dark"] .game-lobby > p,
+html[data-theme="dark"] .game-ranking > p,
+html[data-theme="dark"] .game-finished > p {
+  color: #91a0b9;
+}
+
+html[data-theme="dark"] .game-close {
+  border-color: #35425a;
+  color: #c6d2e8;
+  background: #202a3b;
+}
+
+html[data-theme="dark"] .game-close:hover {
+  border-color: #52658a;
+  color: #fff;
+  background: #2a364b;
+}
+
+html[data-theme="dark"] .game-mode-grid button,
+html[data-theme="dark"] .game-ai-generator,
+html[data-theme="dark"] .game-question-editor,
+html[data-theme="dark"] .game-ranking-row {
+  border-color: #34415a;
+  color: #d7e1f3;
+  background: #202a3b;
+}
+
+html[data-theme="dark"] .game-mode-grid button:hover {
+  border-color: #526b9b;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="dark"] .game-form > label,
+html[data-theme="dark"] .game-link-fields label,
+html[data-theme="dark"] .game-duration,
+html[data-theme="dark"] .game-ai-generator > label,
+html[data-theme="dark"] .game-ai-generator-controls > label,
+html[data-theme="dark"] .game-question-editor legend {
+  color: #b7c5dd;
+}
+
+html[data-theme="dark"] .game-form input,
+html[data-theme="dark"] .game-form select {
+  border-color: #3a4760;
+  color: #e0e8f7;
+  background: #151c29;
+}
+
+html[data-theme="dark"] .game-form input::placeholder {
+  color: #7f8da5;
+}
+
+html[data-theme="dark"] .game-form input:focus,
+html[data-theme="dark"] .game-form select:focus {
+  border-color: #6b89cf;
+  outline-color: rgba(82, 120, 210, 0.22);
+}
+
+html[data-theme="dark"] .game-secondary-button,
+html[data-theme="dark"] .game-back-button,
+html[data-theme="dark"] .game-remove-question {
+  border-color: #3a4968;
+  color: #c6d6f7;
+  background: #222e44;
+}
+
+html[data-theme="dark"] .game-secondary-button:hover:not(:disabled),
+html[data-theme="dark"] .game-back-button:hover {
+  border-color: #566f9e;
+  background: #2a3954;
+}
+
+html[data-theme="dark"] .game-pin-card,
+html[data-theme="dark"] .game-lobby,
+html[data-theme="dark"] .game-question-live,
+html[data-theme="dark"] .game-ranking {
+  border-color: #34415a;
+  background: #1d2738;
+}
+
+html[data-theme="dark"] .game-pin-card span,
+html[data-theme="dark"] .game-pin-card small,
+html[data-theme="dark"] .game-live-count span,
+html[data-theme="dark"] .game-question-meta,
+html[data-theme="dark"] .game-ranking h3 span,
+html[data-theme="dark"] .game-rank-number {
+  color: #94a4bf;
+}
+
+html[data-theme="dark"] .game-pin-card strong,
+html[data-theme="dark"] .game-live-count strong,
+html[data-theme="dark"] .game-question-meta strong,
+html[data-theme="dark"] .game-question-live > h3,
+html[data-theme="dark"] .game-question-live > p,
+html[data-theme="dark"] .game-ranking-row strong,
+html[data-theme="dark"] .game-ranking-row b {
+  color: #e0e8f7;
+}
+
+html[data-theme="dark"] .game-answer-grid button {
+  border-color: #3b4b68;
+  color: #dae4f6;
+  background: #253148;
+}
+
+html[data-theme="dark"] .game-answer-grid button:hover:not(:disabled) {
+  border-color: #6684c7;
+  background: #2d3e5e;
+}
+
+html[data-theme="dark"] .game-answer-grid button:disabled {
+  color: #7f8ca2;
+  background: #20283a;
+}
+
+html[data-theme="dark"] .game-answer-feedback.correct {
+  border-color: #416e58;
+  color: #c6f0d7;
+  background: #20382c;
+}
+
+html[data-theme="dark"] .game-answer-feedback.incorrect {
+  border-color: #764e56;
+  color: #ffd1d5;
+  background: #3b292f;
+}
+
+html[data-theme="dark"] .game-answer-feedback span,
+html[data-theme="dark"] .game-answer-feedback small {
+  color: #b2bfd4;
+}
+
+html[data-theme="dark"] .game-ranking-row {
+  border-color: #303d54;
+}
+
+html[data-theme="dark"] .game-error {
+  border-color: #68484b;
+  color: #ffd5d1;
+  background: #352528;
+}
+
+html[data-theme="dark"] .game-finished > span {
+  color: #c8d6f2;
+}

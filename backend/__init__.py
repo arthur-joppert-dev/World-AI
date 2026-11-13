@@ -25,8 +25,11 @@ db = SQLAlchemy(app)
 from backend.models.models import (
 	Atividade,
 	EntregaAtividade,
+	ExercicioCurriculo,
 	Jogo,
+	LicaoCurriculo,
 	ParticipanteJogo,
+	ProgressoExercicio,
 	Professor,
 	QuestaoJogo,
 	RespostaJogo,
