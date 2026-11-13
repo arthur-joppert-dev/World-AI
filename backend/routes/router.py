@@ -109,6 +109,8 @@ def askAi():
     cmd = data["cmd"]
     try:
         resp = ask(cmd, ido)
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 500
     except RateLimitError:
         return jsonify({"error": "A IA está temporariamente sobrecarregada. Tente novamente em alguns segundos."}), 429
     except (APITimeoutError, APIConnectionError):

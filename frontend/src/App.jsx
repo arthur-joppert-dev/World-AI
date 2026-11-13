@@ -62,11 +62,33 @@ const makeWelcome = (language) => ({
   content: `Olá! Eu sou seu parceiro de conversação. Vamos praticar ${language} juntos?\n\nConverse comigo naturalmente — vou ajudar com correções gentis e dicas úteis ao longo do caminho.`,
 });
 
+function getStorageValue(key, fallback = "") {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    return window.localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function setStorageValue(key, value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage failures, such as browser privacy restrictions.
+  }
+}
+
 function readSavedConversation() {
   try {
-    const saved = JSON.parse(
-      localStorage.getItem("lingua-conversation") || "[]",
-    );
+    const saved = JSON.parse(getStorageValue("lingua-conversation", "[]"));
     return Array.isArray(saved) ? saved : [];
   } catch {
     return [];
@@ -103,10 +125,10 @@ function isSecureOrigin() {
 
 function App() {
   const [language, setLanguage] = useState(
-    () => localStorage.getItem("lingua-language") || "English",
+    () => getStorageValue("lingua-language", "English") || "English",
   );
   const [level, setLevel] = useState(
-    () => localStorage.getItem("lingua-level") || "A2",
+    () => getStorageValue("lingua-level", "A2") || "A2",
   );
   const [messages, setMessages] = useState(readSavedConversation);
   const [translations, setTranslations] = useState({});
@@ -128,7 +150,7 @@ function App() {
   const [voiceSessionActive, setVoiceSessionActive] = useState(false);
   const [voiceMode, setVoiceMode] = useState(true);
   const [voiceSpeed, setVoiceSpeed] = useState(() => {
-    const savedSpeed = Number(localStorage.getItem("world-voice-speed"));
+    const savedSpeed = Number(getStorageValue("world-voice-speed", "1"));
     return Number.isFinite(savedSpeed) && savedSpeed >= 0.5 && savedSpeed <= 1.5
       ? savedSpeed
       : 1;
@@ -165,19 +187,19 @@ function App() {
       : `${language} → Português`;
 
   useEffect(() => {
-    localStorage.setItem("lingua-language", language);
+    setStorageValue("lingua-language", language);
   }, [language]);
 
   useEffect(() => {
-    localStorage.setItem("lingua-level", level);
+    setStorageValue("lingua-level", level);
   }, [level]);
 
   useEffect(() => {
-    localStorage.setItem("world-voice-speed", String(voiceSpeed));
+    setStorageValue("world-voice-speed", String(voiceSpeed));
   }, [voiceSpeed]);
 
   useEffect(() => {
-    localStorage.setItem("lingua-conversation", JSON.stringify(messages));
+    setStorageValue("lingua-conversation", JSON.stringify(messages));
     if (listRef.current)
       listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, isSending]);

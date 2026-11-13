@@ -9,8 +9,14 @@ from flask_sqlalchemy import SQLAlchemy
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
+project_root = Path(__file__).resolve().parent.parent
+instance_dir = project_root / "instance"
+instance_dir.mkdir(parents=True, exist_ok=True)
+
+db_path = instance_dir / "main.db"
+
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///main.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path.as_posix()}"
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY") or secrets.token_urlsafe(32)
 app.config["ADMIN_API_KEY"] = os.getenv("ADMIN_API_KEY")
 CORS(app, supports_credentials=True)
