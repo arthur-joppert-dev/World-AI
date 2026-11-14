@@ -19,7 +19,16 @@ app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path.as_posix()}"
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY") or secrets.token_urlsafe(32)
 app.config["ADMIN_API_KEY"] = os.getenv("ADMIN_API_KEY")
-CORS(app, supports_credentials=True)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.getenv(
+	"SESSION_COOKIE_SECURE", "false"
+).lower() == "true"
+CORS(
+	app,
+	supports_credentials=True,
+	origins=os.getenv("CORS_ORIGINS", "*"),
+)
 db = SQLAlchemy(app)
 
 from backend.models.models import (

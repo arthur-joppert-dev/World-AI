@@ -18,6 +18,28 @@ mantido em `instance/` no host, e o arquivo `backend/.env` é usado apenas para
 fornecer variáveis ao container, sem ser incluído na imagem. Para encerrar, use
 `docker compose down`.
 
+## Publicar em um VPS Hostinger
+
+O instalador de produção requer um VPS com Ubuntu ou Debian; hospedagem
+compartilhada não executa estes containers Docker.
+
+1. Aponte o registro DNS `A` do seu domínio para o IP do VPS. Libere as portas
+   `80` e `443` no firewall da Hostinger e no firewall do servidor.
+2. Conecte-se ao VPS por SSH, clone este repositório e entre na pasta do projeto.
+3. Execute `chmod +x install.sh` e depois `sudo ./install.sh`.
+4. Se a chave Groq ainda não estiver configurada, informe-a quando solicitado.
+   O instalador gera a chave administrativa e o segredo de sessão, solicita o
+   domínio e salva as configurações localmente sem exibir os segredos.
+5. Acesse `https://seu-dominio`. O Caddy solicita e renova o certificado HTTPS
+   automaticamente quando o DNS e as portas estiverem configurados.
+
+O instalador usa `compose.hostinger.yaml`: o frontend é servido como arquivos
+estáticos, a API roda com Gunicorn e o SQLite permanece em `instance/`. Para
+atualizar uma versão depois de baixar as alterações do repositório, rode
+`sudo docker compose --env-file .env.hostinger -f compose.hostinger.yaml up -d --build`.
+Faça backup regular de `instance/main.db` e mantenha `backend/.env` e
+`.env.hostinger` privados.
+
 ## Criar turmas
 
 1. No site, abra **Conteúdo** e informe a chave configurada como

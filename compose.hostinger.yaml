@@ -1,0 +1,44 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.production
+    env_file:
+      - ./backend/.env
+    environment:
+      SESSION_COOKIE_SECURE: "true"
+      CORS_ORIGINS: https://${DOMAIN}
+    expose:
+      - "3000"
+    restart: unless-stopped
+    volumes:
+      - ./instance:/app/instance
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.production
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - ./.env.hostinger
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    restart: unless-stopped
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
