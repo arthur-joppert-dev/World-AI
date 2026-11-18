@@ -80,5 +80,5 @@ indisponível, a resposta não é registrada e o aluno pode tentar novamente.
 
 ## PARA O(S) DESENVOLVEDOR(ES) APENAS!
 # TODO LIST
- - [] Corrigir os botões da **Navbar** no Front-End (Não deixar eles tão colados) (18/11/2026)
- - [] Melhorar a **segurança** do Back-End (18/11/2026)
+ - [ ] Corrigir os botões da **Navbar** no Front-End (Não deixar eles tão colados) (18/11/2026)
+ - [ ] Melhorar a **segurança** do Back-End (18/11/2026)
