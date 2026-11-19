@@ -31,15 +31,6 @@ const LEVELS = [
   { code: "C2", label: "Proficiente", description: "Domínio quase nativo" },
 ];
 
-const LEVEL_GUIDANCE = {
-  A1: "Use palavras muito frequentes e frases curtíssimas, uma ideia por frase. Prefira presente e estruturas básicas; evite expressões idiomáticas e explique palavras novas em português.",
-  A2: "Use vocabulário cotidiano e frases curtas. Use estruturas simples para falar de rotina, passado e planos; explique expressões menos comuns de forma breve em português.",
-  B1: "Use vocabulário comum variado e frases de extensão moderada, incluindo conectores simples. Introduza expressões naturais e explique termos menos familiares sem simplificar demais.",
-  B2: "Use vocabulário variado e natural, combinações comuns de palavras e estruturas mais complexas quando úteis. Inclua expressões idiomáticas frequentes com contexto breve.",
-  C1: "Use vocabulário preciso, nuances, colocações naturais e estruturas complexas. Explique somente nuances ou expressões raras que sejam relevantes.",
-  C2: "Converse com fluência natural, vocabulário rico e nuances idiomáticas e culturais, como em uma conversa entre falantes proficientes; evite simplificações artificiais.",
-};
-
 const SUGGESTIONS = [
   {
     icon: "✦",
@@ -110,6 +101,19 @@ function getSpeechLanguageCode(language) {
   return map[language] || "en-US";
 }
 
+function getSpeechPreviewText(language) {
+  const previews = {
+    English: "Hello, this is a voice preview.",
+    Español: "Hola, esta es una prueba de voz.",
+    Français: "Bonjour, ceci est un aperçu vocal.",
+    Deutsch: "Hallo, dies ist eine Sprachprobe.",
+    Italiano: "Ciao, questa è un'anteprima vocale.",
+    Português: "Olá, esta é uma prévia de voz.",
+    日本語: "こんにちは、音声のプレビューです。",
+  };
+  return previews[language] || previews.English;
+}
+
 function isSecureOrigin() {
   if (typeof window === "undefined") {
     return true;
@@ -154,13 +158,29 @@ function App() {
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
   const [voiceSessionActive, setVoiceSessionActive] = useState(false);
   const [voiceMode, setVoiceMode] = useState(true);
+  const [agents, setAgents] = useState([]);
+  const [personalities, setPersonalities] = useState([]);
+  const [selectedAgent, setSelectedAgent] = useState(() =>
+    getStorageValue("world-chat-agent", "tutor"),
+  );
+  const [selectedPersonality, setSelectedPersonality] = useState(() =>
+    getStorageValue("world-chat-personality", "supportive"),
+  );
+  const [elevenLabsVoices, setElevenLabsVoices] = useState([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState(() =>
+    getStorageValue("world-elevenlabs-voice", ""),
+  );
+  const [voiceCatalogLoading, setVoiceCatalogLoading] = useState(true);
+  const [voiceError, setVoiceError] = useState("");
+  const [optionsError, setOptionsError] = useState("");
   const [voiceSpeed, setVoiceSpeed] = useState(() => {
-    const savedSpeed = Number(getStorageValue("world-voice-speed", "1"));
-    return Number.isFinite(savedSpeed) && savedSpeed >= 0.5 && savedSpeed <= 1.5
+    const savedSpeed = Number(getStorageValue("world-voice-speed", "0.95"));
+    return Number.isFinite(savedSpeed) && savedSpeed >= 0.7 && savedSpeed <= 1.2
       ? savedSpeed
-      : 1;
+      : 0.95;
   });
   const [error, setError] = useState("");
   const listRef = useRef(null);
@@ -171,10 +191,31 @@ function App() {
   const voiceAwaitingResponseRef = useRef(false);
   const voiceTurnTranscriptRef = useRef("");
   const recognitionSegmentRef = useRef("");
+  const recognitionActiveRef = useRef(false);
+  const recognitionStartingRef = useRef(false);
+  const recognitionRestartTimerRef = useRef(null);
   const voiceSilenceTimerRef = useRef(null);
   const startRecognitionRef = useRef(null);
   const finishVoiceTurnRef = useRef(null);
   const sendMessageRef = useRef(null);
+  const speechAudioRef = useRef(null);
+  const fallbackVoiceCaptureRef = useRef({
+    stream: null,
+    recorder: null,
+    audioContext: null,
+    analyser: null,
+    source: null,
+    animationFrame: null,
+    chunks: [],
+    stopReason: null,
+    speechDetected: false,
+    lastSpeechAt: 0,
+    speechStartedAt: 0,
+    noiseFloor: 0,
+  });
+  const finishFallbackVoiceRef = useRef(null);
+  const stopFallbackVoiceRef = useRef(null);
+  const transcriptionAbortRef = useRef(null);
 
   const currentLanguage =
     LANGUAGES.find((item) => item.label === language) || LANGUAGES[0];
@@ -206,6 +247,110 @@ function App() {
   }, [voiceSpeed]);
 
   useEffect(() => {
+    setStorageValue("world-chat-agent", selectedAgent);
+  }, [selectedAgent]);
+
+  useEffect(() => {
+    setStorageValue("world-chat-personality", selectedPersonality);
+  }, [selectedPersonality]);
+
+  useEffect(() => {
+    setStorageValue("world-elevenlabs-voice", selectedVoiceId);
+  }, [selectedVoiceId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const apiBase = import.meta.env.VITE_API_URL || "/api";
+
+    async function loadOptions() {
+      try {
+        const response = await fetch(
+          `${apiBase.replace(/\/$/, "")}/chat/options`,
+          { signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Não foi possível carregar os agentes.");
+        }
+        const availableAgents = Array.isArray(payload.agents)
+          ? payload.agents
+          : [];
+        const availablePersonalities = Array.isArray(payload.personalities)
+          ? payload.personalities
+          : [];
+        setAgents(availableAgents);
+        setPersonalities(availablePersonalities);
+        setSelectedAgent((current) =>
+          availableAgents.some((agent) => agent.id === current)
+            ? current
+            : (availableAgents[0]?.id ?? ""),
+        );
+        setSelectedPersonality((current) =>
+          availablePersonalities.some(
+            (personality) => personality.id === current,
+          )
+            ? current
+            : (availablePersonalities[0]?.id ?? ""),
+        );
+      } catch (requestError) {
+        if (requestError.name !== "AbortError") {
+          setOptionsError(requestError.message);
+        }
+      }
+
+      try {
+        const response = await fetch(
+          `${apiBase.replace(/\/$/, "")}/voice/voices`,
+          { signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Não foi possível carregar as vozes.");
+        }
+        const availableVoices = Array.isArray(payload.voices)
+          ? payload.voices
+          : [];
+        setElevenLabsVoices(availableVoices);
+        setSelectedVoiceId((current) =>
+          availableVoices.some((voice) => voice.voice_id === current)
+            ? current
+            : (availableVoices[0]?.voice_id ?? ""),
+        );
+        if (!availableVoices.length) {
+          setVoiceError("Sua conta ElevenLabs não tem vozes disponíveis.");
+        } else {
+          setVoiceError("");
+        }
+      } catch (requestError) {
+        if (requestError.name !== "AbortError") {
+          setVoiceError(requestError.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setVoiceCatalogLoading(false);
+        }
+      }
+    }
+
+    loadOptions();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(
+    () => () => {
+      const current = speechAudioRef.current;
+      if (current) {
+        current.controller.abort();
+        if (current.audio && !current.audio.ended) {
+          current.audio.pause();
+        }
+        if (current.url) URL.revokeObjectURL(current.url);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
     const theme = isDarkMode ? "dark" : "light";
     document.documentElement.dataset.theme = theme;
     setStorageValue("world-theme", theme);
@@ -217,18 +362,21 @@ function App() {
       listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, isSending]);
 
-  const voiceSupported =
-    isSecureOrigin() &&
+  const hasSpeechRecognition =
     typeof window !== "undefined" &&
     Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-
+  const hasMediaRecorder =
+    typeof window !== "undefined" &&
+    Boolean(
+      window.navigator?.mediaDevices?.getUserMedia &&
+        window.MediaRecorder &&
+        (window.AudioContext || window.webkitAudioContext),
+    );
+  const voiceSupported =
+    isSecureOrigin() && (hasSpeechRecognition || hasMediaRecorder);
   const speakAssistantText = useCallback(
-    (text, onDone = () => {}) => {
-      if (
-        !voiceMode ||
-        typeof window === "undefined" ||
-        !("speechSynthesis" in window)
-      ) {
+    async (text, onDone = () => {}, preview = false) => {
+      if (!voiceMode && !preview) {
         onDone();
         return;
       }
@@ -239,28 +387,198 @@ function App() {
         .replace(/[_`~]/g, "")
         .replace(/\s+/g, " ")
         .trim();
-
-      if (!cleanText) {
+      if (!cleanText || !selectedVoiceId) {
+        onDone();
+        return;
+      }
+      if (cleanText.length > 4000) {
+        setError("O texto é longo demais para gerar o áudio de uma só vez.");
         onDone();
         return;
       }
 
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = getSpeechLanguageCode(language);
-      utterance.rate = voiceSpeed;
-      utterance.pitch = 1.1;
-      utterance.volume = 1;
-      utterance.onend = onDone;
-      utterance.onerror = onDone;
-      window.speechSynthesis.speak(utterance);
+      const previous = speechAudioRef.current;
+      if (previous) {
+        previous.controller.abort();
+        if (previous.audio) {
+          previous.audio.onended = null;
+          previous.audio.onerror = null;
+          if (!previous.audio.ended) previous.audio.pause();
+        }
+        if (previous.url) URL.revokeObjectURL(previous.url);
+      }
+
+      let completed = false;
+      let audio;
+      let audioUrl;
+      const controller = new AbortController();
+      const playback = { audio: null, url: null, controller };
+      speechAudioRef.current = playback;
+      const finish = (errorMessage = "", releaseAudio = false) => {
+        if (completed) return;
+        completed = true;
+        if (audio) {
+          audio.onended = null;
+          audio.onerror = null;
+        }
+        if (releaseAudio && audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+        }
+        if (releaseAudio && speechAudioRef.current === playback) {
+          speechAudioRef.current = null;
+        }
+        if (errorMessage) setError(errorMessage);
+        onDone();
+      };
+
+      try {
+        const apiBase = import.meta.env.VITE_API_URL || "/api";
+        const response = await fetch(
+          `${apiBase.replace(/\/$/, "")}/voice/speech`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              text: cleanText,
+              voice_id: selectedVoiceId,
+              speed: voiceSpeed,
+            }),
+          },
+        );
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(
+            payload.error || `Falha ao gerar a voz (${response.status}).`,
+          );
+        }
+
+        if (controller.signal.aborted) return;
+        const supportsStreamingAudio =
+          response.body &&
+          window.MediaSource &&
+          window.MediaSource.isTypeSupported("audio/mpeg");
+        if (supportsStreamingAudio) {
+          const mediaSource = new MediaSource();
+          audio = new Audio();
+          audioUrl = URL.createObjectURL(mediaSource);
+          audio.src = audioUrl;
+          playback.audio = audio;
+          playback.url = audioUrl;
+          audio.onended = () => finish("", true);
+          audio.onerror = () => {
+            finish(
+              "Não foi possível reproduzir o áudio recebido do ElevenLabs.",
+              true,
+            );
+          };
+          await new Promise((resolve, reject) => {
+            if (mediaSource.readyState === "open") {
+              resolve();
+              return;
+            }
+            mediaSource.addEventListener("sourceopen", resolve, { once: true });
+            mediaSource.addEventListener(
+              "sourceclose",
+              () => reject(new Error("O fluxo de áudio foi encerrado.")),
+              { once: true },
+            );
+            controller.signal.addEventListener(
+              "abort",
+              () => reject(new DOMException("Aborted", "AbortError")),
+              { once: true },
+            );
+          });
+          if (controller.signal.aborted) return;
+
+          const sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+          const reader = response.body.getReader();
+          const pendingChunks = [];
+          let streamEnded = false;
+          let firstChunkAppended = false;
+          let playbackStarted = false;
+          let resolveFirstChunk;
+          const firstChunkReady = new Promise((resolve) => {
+            resolveFirstChunk = resolve;
+          });
+          const appendPendingChunks = () => {
+            if (sourceBuffer.updating) return;
+            if (pendingChunks.length) {
+              sourceBuffer.appendBuffer(pendingChunks.shift());
+            } else if (
+              streamEnded &&
+              mediaSource.readyState === "open"
+            ) {
+              mediaSource.endOfStream();
+            }
+          };
+          sourceBuffer.addEventListener("updateend", () => {
+            if (!firstChunkAppended) {
+              firstChunkAppended = true;
+              resolveFirstChunk();
+            }
+            appendPendingChunks();
+          });
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              streamEnded = true;
+              appendPendingChunks();
+              break;
+            }
+            pendingChunks.push(value);
+            appendPendingChunks();
+            if (!playbackStarted) {
+              await firstChunkReady;
+              if (controller.signal.aborted) return;
+              playbackStarted = true;
+              await audio.play();
+            }
+          }
+        } else {
+          audioUrl = URL.createObjectURL(await response.blob());
+          if (controller.signal.aborted) {
+            URL.revokeObjectURL(audioUrl);
+            return;
+          }
+          audio = new Audio(audioUrl);
+          playback.audio = audio;
+          playback.url = audioUrl;
+          audio.onended = () => finish("", true);
+          audio.onerror = () => {
+            finish(
+              "Não foi possível reproduzir o áudio recebido do ElevenLabs.",
+              true,
+            );
+          };
+          await audio.play();
+        }
+      } catch (requestError) {
+        if (!controller.signal.aborted) finish(requestError.message, true);
+      }
     },
-    [language, voiceMode, voiceSpeed],
+    [selectedVoiceId, voiceMode, voiceSpeed],
   );
 
   const sendMessage = useCallback(
-    async (text = draft) => {
+    async (text = draft, fromVoice = false) => {
       const content = text.trim();
       if (!content || isSending) return;
+
+      if (fromVoice) {
+        voiceSessionActiveRef.current = false;
+        voiceAwaitingResponseRef.current = false;
+        setVoiceSessionActive(false);
+        isListeningRef.current = false;
+        setIsListening(false);
+        setIsTranscribingVoice(false);
+        if (recognitionRestartTimerRef.current) {
+          window.clearTimeout(recognitionRestartTimerRef.current);
+          recognitionRestartTimerRef.current = null;
+        }
+        stopFallbackVoiceRef.current?.();
+      }
 
       const userMessage = { id: crypto.randomUUID(), role: "user", content };
       const history = [...messages, userMessage]
@@ -278,9 +596,6 @@ function App() {
         )
         .join("\n");
       const cmd = [
-        `Você é um tutor amigável de conversação em ${language}. O aluno está no nível ${level} (${currentLevel.label}).`,
-        `Converse principalmente em ${language}. Ajuste rigorosamente o vocabulário, a gramática e o tamanho das frases ao nível ${level}: ${LEVEL_GUIDANCE[level]}`,
-        "Responda primeiro ao significado e à intenção da última mensagem, como em uma conversa normal entre pessoas. Seja natural, amigável e direto, desenvolva o assunto e faça uma pergunta relacionada quando isso ajudar a conversa a continuar. Não interrompa a conversa com análise gramatical, correções ou aula espontânea; o aluno pode pedir feedback separado sobre a frase.",
         "Histórico recente da conversa:",
         conversation,
         "Responda à última mensagem do aluno.",
@@ -291,7 +606,13 @@ function App() {
         const response = await fetch(`${apiBase.replace(/\/$/, "")}/ask`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cmd, ido: language }),
+          body: JSON.stringify({
+            cmd,
+            ido: language,
+            agent: selectedAgent,
+            personality: selectedPersonality,
+            level,
+          }),
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -318,7 +639,7 @@ function App() {
           },
         ]);
         speakAssistantText(assistantReply, () => {
-          if (voiceSessionActiveRef.current) {
+          if (!fromVoice && voiceSessionActiveRef.current) {
             voiceAwaitingResponseRef.current = false;
             startRecognitionRef.current?.();
           }
@@ -332,7 +653,7 @@ function App() {
             ? "Não foi possível conectar ao servidor. Verifique se o backend está rodando na porta 3000 e se este dispositivo está na mesma rede."
             : requestError.message,
         );
-        if (voiceSessionActiveRef.current) {
+        if (!fromVoice && voiceSessionActiveRef.current) {
           voiceAwaitingResponseRef.current = false;
           startRecognitionRef.current?.();
         }
@@ -342,13 +663,15 @@ function App() {
       }
     },
     [
-      currentLevel.label,
       draft,
       isSending,
       language,
       level,
       messages,
+      selectedAgent,
+      selectedPersonality,
       speakAssistantText,
+      stopFallbackVoiceRef,
     ],
   );
 
@@ -514,11 +837,13 @@ function App() {
 
     try {
       recognitionRef.current?.stop();
-    } catch {
-      // The recognition session may already have stopped naturally.
+    } catch (stopError) {
+      if (stopError.name !== "InvalidStateError") {
+        setError("O navegador não conseguiu encerrar a captura de voz.");
+      }
     }
 
-    sendMessageRef.current?.(content);
+    sendMessageRef.current?.(content, true);
   }, []);
 
   useEffect(() => {
@@ -544,20 +869,42 @@ function App() {
       if (
         !voiceSessionActiveRef.current ||
         voiceAwaitingResponseRef.current ||
-        isListeningRef.current
+        recognitionActiveRef.current ||
+        recognitionStartingRef.current
       ) {
         return;
       }
 
+      recognitionStartingRef.current = true;
       try {
         recognition.start();
-        isListeningRef.current = true;
-        setIsListening(true);
-      } catch {
-        // Some browsers throw while restarting; onend will try again.
+      } catch (startError) {
+        recognitionStartingRef.current = false;
+        if (startError.name !== "InvalidStateError") {
+          voiceSessionActiveRef.current = false;
+          setVoiceSessionActive(false);
+          setError("O navegador não conseguiu iniciar a captura do microfone.");
+        }
       }
     };
     startRecognitionRef.current = startRecognition;
+
+    recognition.onstart = () => {
+      recognitionStartingRef.current = false;
+      if (!voiceSessionActiveRef.current || voiceAwaitingResponseRef.current) {
+        try {
+          recognition.stop();
+        } catch (stopError) {
+          if (stopError.name !== "InvalidStateError") {
+            setError("O navegador não conseguiu encerrar a captura de voz.");
+          }
+        }
+        return;
+      }
+      recognitionActiveRef.current = true;
+      isListeningRef.current = true;
+      setIsListening(true);
+    };
 
     recognition.onresult = (event) => {
       recognitionSegmentRef.current = Array.from(event.results)
@@ -584,10 +931,16 @@ function App() {
     };
 
     recognition.onend = () => {
+      recognitionStartingRef.current = false;
+      recognitionActiveRef.current = false;
       isListeningRef.current = false;
       setIsListening(false);
 
-      if (recognitionSegmentRef.current) {
+      if (
+        recognitionSegmentRef.current &&
+        voiceSessionActiveRef.current &&
+        !voiceAwaitingResponseRef.current
+      ) {
         voiceTurnTranscriptRef.current = [
           voiceTurnTranscriptRef.current,
           recognitionSegmentRef.current,
@@ -600,7 +953,13 @@ function App() {
       }
 
       if (voiceSessionActiveRef.current && !voiceAwaitingResponseRef.current) {
-        window.setTimeout(() => startRecognition(), 250);
+        if (recognitionRestartTimerRef.current) {
+          window.clearTimeout(recognitionRestartTimerRef.current);
+        }
+        recognitionRestartTimerRef.current = window.setTimeout(() => {
+          recognitionRestartTimerRef.current = null;
+          startRecognition();
+        }, 250);
         return;
       }
     };
@@ -611,10 +970,44 @@ function App() {
       }
 
       voiceSessionActiveRef.current = false;
+      voiceAwaitingResponseRef.current = false;
+      recognitionActiveRef.current = false;
+      recognitionStartingRef.current = false;
       setVoiceSessionActive(false);
       isListeningRef.current = false;
       setIsListening(false);
-      setError("Não foi possível capturar a sua voz agora. Tente novamente.");
+      if (recognitionRestartTimerRef.current) {
+        window.clearTimeout(recognitionRestartTimerRef.current);
+        recognitionRestartTimerRef.current = null;
+      }
+      if (voiceSilenceTimerRef.current) {
+        clearTimeout(voiceSilenceTimerRef.current);
+        voiceSilenceTimerRef.current = null;
+      }
+      const partialTranscript = [
+        voiceTurnTranscriptRef.current,
+        recognitionSegmentRef.current,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      if (partialTranscript) setDraft(partialTranscript);
+      const recognitionErrors = {
+        "audio-capture":
+          "O navegador não encontrou um microfone. Verifique a conexão e as permissões do dispositivo.",
+        "language-not-supported":
+          "O reconhecimento de voz não oferece suporte ao idioma selecionado.",
+        "not-allowed":
+          "O acesso ao microfone ou ao reconhecimento de voz foi bloqueado. Permita o acesso nas configurações do navegador.",
+        "service-not-allowed":
+          "O navegador bloqueou o serviço de reconhecimento de voz.",
+        network:
+          "O reconhecimento de voz não conseguiu se conectar ao serviço do navegador. Verifique a internet e tente novamente.",
+      };
+      setError(
+        recognitionErrors[event.error] ||
+          `Falha no reconhecimento de voz (${event.error}). Verifique o microfone e tente novamente.`,
+      );
     };
 
     recognitionRef.current = recognition;
@@ -623,15 +1016,345 @@ function App() {
       if (voiceSilenceTimerRef.current) {
         clearTimeout(voiceSilenceTimerRef.current);
       }
+      if (recognitionRestartTimerRef.current) {
+        clearTimeout(recognitionRestartTimerRef.current);
+        recognitionRestartTimerRef.current = null;
+      }
       voiceSessionActiveRef.current = false;
+      voiceAwaitingResponseRef.current = false;
       isListeningRef.current = false;
+      setVoiceSessionActive(false);
+      setIsListening(false);
+      recognitionStartingRef.current = false;
+      voiceTurnTranscriptRef.current = "";
+      recognitionSegmentRef.current = "";
+      const shouldAbort = recognitionActiveRef.current;
+      recognitionActiveRef.current = false;
+      recognition.onstart = null;
       recognition.onend = null;
       recognition.onresult = null;
       recognition.onerror = null;
       startRecognitionRef.current = null;
-      recognition.stop();
+      recognitionRef.current = null;
+      if (shouldAbort) {
+        try {
+          recognition.abort();
+        } catch (abortError) {
+          if (abortError.name !== "InvalidStateError") {
+            throw abortError;
+          }
+        }
+      }
     };
   }, [language]);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      window.SpeechRecognition ||
+      window.webkitSpeechRecognition ||
+      !hasMediaRecorder
+    ) {
+      return undefined;
+    }
+
+    const capture = fallbackVoiceCaptureRef.current;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+
+    const stopCapture = () => {
+      if (capture.animationFrame !== null) {
+        window.cancelAnimationFrame(capture.animationFrame);
+        capture.animationFrame = null;
+      }
+      if (voiceSilenceTimerRef.current) {
+        window.clearTimeout(voiceSilenceTimerRef.current);
+        voiceSilenceTimerRef.current = null;
+      }
+      transcriptionAbortRef.current?.abort();
+      transcriptionAbortRef.current = null;
+      if (capture.recorder?.state === "recording") {
+        capture.recorder.stopReason = "cancel";
+        capture.recorder.stop();
+      }
+      capture.recorder = null;
+      capture.stream?.getTracks().forEach((track) => track.stop());
+      capture.stream = null;
+      capture.source?.disconnect();
+      capture.source = null;
+      capture.analyser = null;
+      if (capture.audioContext && capture.audioContext.state !== "closed") {
+        void capture.audioContext.close();
+      }
+      capture.audioContext = null;
+      capture.chunks = [];
+      capture.speechDetected = false;
+    };
+
+    const restartAfterTranscriptionError = () => {
+      voiceAwaitingResponseRef.current = false;
+      setIsTranscribingVoice(false);
+      isListeningRef.current = false;
+      setIsListening(false);
+      if (voiceSessionActiveRef.current) {
+        startRecognitionRef.current?.();
+      }
+    };
+
+    const transcribeRecordedAudio = async (blob) => {
+      if (blob.size < 512) {
+        setError("Não consegui entender a fala. Tente falar um pouco mais perto do microfone.");
+        restartAfterTranscriptionError();
+        return;
+      }
+
+      const controller = new AbortController();
+      transcriptionAbortRef.current = controller;
+      const formData = new FormData();
+      const extension = blob.type.includes("ogg")
+        ? "ogg"
+        : blob.type.includes("mp4")
+          ? "mp4"
+          : "webm";
+      formData.append("audio", blob, `voice.${extension}`);
+      formData.append("language", language);
+
+      try {
+        const apiBase = import.meta.env.VITE_API_URL || "/api";
+        const response = await fetch(
+          `${apiBase.replace(/\/$/, "")}/voice/transcribe`,
+          {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          },
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            payload.error ||
+              `Falha ao reconhecer a fala (${response.status}).`,
+          );
+        }
+        if (typeof payload.text !== "string" || !payload.text.trim()) {
+          throw new Error("Não consegui entender a fala. Tente novamente.");
+        }
+        if (voiceSessionActiveRef.current) {
+          setIsTranscribingVoice(false);
+          sendMessageRef.current?.(payload.text.trim(), true);
+        }
+      } catch (transcriptionError) {
+        if (transcriptionError.name !== "AbortError") {
+          setError(transcriptionError.message);
+          restartAfterTranscriptionError();
+        }
+      } finally {
+        if (transcriptionAbortRef.current === controller) {
+          transcriptionAbortRef.current = null;
+        }
+      }
+    };
+
+    const startCapture = async () => {
+      if (
+        !voiceSessionActiveRef.current ||
+        voiceAwaitingResponseRef.current ||
+        capture.recorder?.state === "recording"
+      ) {
+        return;
+      }
+
+      try {
+        if (!capture.audioContext) {
+          capture.audioContext = new AudioContext();
+          await capture.audioContext.resume();
+          if (!voiceSessionActiveRef.current) {
+            stopCapture();
+            return;
+          }
+        }
+        if (!capture.stream) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              autoGainControl: true,
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          });
+          if (!voiceSessionActiveRef.current) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          capture.stream = stream;
+          capture.analyser = capture.audioContext.createAnalyser();
+          capture.analyser.fftSize = 1024;
+          capture.source = capture.audioContext.createMediaStreamSource(stream);
+          capture.source.connect(capture.analyser);
+        }
+
+        const supportedMimeType = [
+          "audio/webm;codecs=opus",
+          "audio/ogg;codecs=opus",
+          "audio/mp4",
+        ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+        const recorder = supportedMimeType
+          ? new MediaRecorder(capture.stream, { mimeType: supportedMimeType })
+          : new MediaRecorder(capture.stream);
+        capture.recorder = recorder;
+        capture.chunks = [];
+        recorder.stopReason = null;
+        capture.speechDetected = false;
+        capture.speechStartedAt = 0;
+        capture.noiseFloor = 0;
+        recorder.ondataavailable = (event) => {
+          if (event.data.size) capture.chunks.push(event.data);
+        };
+        recorder.onstop = () => {
+          const stopReason = recorder.stopReason;
+          const blob = new Blob(capture.chunks, {
+            type: recorder.mimeType || "audio/webm",
+          });
+          capture.chunks = [];
+          if (capture.recorder === recorder) capture.recorder = null;
+          if (stopReason === "transcribe") {
+            void transcribeRecordedAudio(blob);
+          }
+        };
+        recorder.onerror = () => {
+          voiceSessionActiveRef.current = false;
+          voiceAwaitingResponseRef.current = false;
+          setVoiceSessionActive(false);
+          isListeningRef.current = false;
+          setIsListening(false);
+          stopCapture();
+          setError("O Firefox não conseguiu gravar o áudio do microfone.");
+        };
+        recorder.start(250);
+        setError("");
+        isListeningRef.current = true;
+        setIsListening(true);
+
+        const samples = new Float32Array(capture.analyser.fftSize);
+        let lastMeterUpdate = 0;
+        const monitorAudioLevel = (timestamp) => {
+          if (
+            !voiceSessionActiveRef.current ||
+            voiceAwaitingResponseRef.current ||
+            capture.recorder !== recorder ||
+            recorder.state !== "recording"
+          ) {
+            return;
+          }
+
+          if (timestamp - lastMeterUpdate >= 100) {
+            lastMeterUpdate = timestamp;
+            capture.analyser.getFloatTimeDomainData(samples);
+            const volume = Math.sqrt(
+              samples.reduce((total, sample) => total + sample * sample, 0) /
+                samples.length,
+            );
+            const speechThreshold = Math.max(0.006, capture.noiseFloor * 3);
+            if (volume >= speechThreshold) {
+              if (!capture.speechDetected) {
+                capture.speechStartedAt = timestamp;
+              }
+              capture.speechDetected = true;
+              capture.lastSpeechAt = timestamp;
+            } else {
+              if (!capture.speechDetected) {
+                capture.noiseFloor =
+                  capture.noiseFloor === 0
+                    ? volume
+                    : capture.noiseFloor * 0.95 + volume * 0.05;
+              } else if (timestamp - capture.speechStartedAt < 250) {
+                capture.speechDetected = false;
+              }
+              if (
+                capture.speechDetected &&
+                timestamp - capture.speechStartedAt >= 250 &&
+                timestamp - capture.lastSpeechAt >= 1000
+              ) {
+                voiceAwaitingResponseRef.current = true;
+                setIsListening(false);
+                setIsTranscribingVoice(true);
+                isListeningRef.current = false;
+                recorder.stopReason = "transcribe";
+                capture.animationFrame = null;
+                recorder.stop();
+                return;
+              }
+            }
+          }
+
+          capture.animationFrame =
+            window.requestAnimationFrame(monitorAudioLevel);
+        };
+        capture.animationFrame =
+          window.requestAnimationFrame(monitorAudioLevel);
+      } catch (captureError) {
+        if (!voiceSessionActiveRef.current) {
+          stopCapture();
+          return;
+        }
+        voiceSessionActiveRef.current = false;
+        voiceAwaitingResponseRef.current = false;
+        setVoiceSessionActive(false);
+        isListeningRef.current = false;
+        setIsListening(false);
+        stopCapture();
+        const captureErrors = {
+          NotAllowedError:
+            "Permita o acesso ao microfone nas configurações do Firefox e tente novamente.",
+          NotFoundError:
+            "O Firefox não encontrou um microfone conectado ao dispositivo.",
+          NotReadableError:
+            "O microfone está sendo usado por outro aplicativo ou não pode ser acessado.",
+        };
+        setError(
+          captureErrors[captureError.name] ||
+            "Não foi possível iniciar o microfone. Verifique as permissões e tente novamente.",
+        );
+      }
+    };
+
+    const finishCaptureTurn = () => {
+      const recorder = capture.recorder;
+      if (!recorder || recorder.state !== "recording") return false;
+      if (!capture.speechDetected && capture.chunks.length === 0) {
+        setError("Não recebi áudio. Fale e toque em Concluir fala para enviar.");
+        return false;
+      }
+
+      voiceAwaitingResponseRef.current = true;
+      isListeningRef.current = false;
+      setIsListening(false);
+      setIsTranscribingVoice(true);
+      recorder.stopReason = "transcribe";
+      if (capture.animationFrame !== null) {
+        window.cancelAnimationFrame(capture.animationFrame);
+        capture.animationFrame = null;
+      }
+      recorder.stop();
+      return true;
+    };
+
+    startRecognitionRef.current = startCapture;
+    finishFallbackVoiceRef.current = finishCaptureTurn;
+    stopFallbackVoiceRef.current = stopCapture;
+
+    return () => {
+      voiceSessionActiveRef.current = false;
+      voiceAwaitingResponseRef.current = false;
+      setVoiceSessionActive(false);
+      setIsListening(false);
+      setIsTranscribingVoice(false);
+      stopCapture();
+      if (startRecognitionRef.current === startCapture) {
+        startRecognitionRef.current = null;
+      }
+      finishFallbackVoiceRef.current = null;
+      stopFallbackVoiceRef.current = null;
+    };
+  }, [hasMediaRecorder, language]);
 
   function startNewChat() {
     setMessages([]);
@@ -641,21 +1364,49 @@ function App() {
   }
 
   async function toggleVoiceMode() {
-    if (!voiceSupported || !recognitionRef.current) {
+    if (!voiceSupported) {
       setError(
-        "Reconhecimento de voz bloqueado em origem insegura. Use http://localhost ou HTTPS.",
+        isSecureOrigin()
+          ? "Este navegador não oferece suporte à captura de voz necessária."
+          : "O acesso ao microfone exige http://localhost ou uma conexão HTTPS.",
       );
       return;
     }
 
     if (voiceSessionActiveRef.current) {
+      if (!recognitionRef.current && isListeningRef.current) {
+        finishFallbackVoiceRef.current?.();
+        return;
+      }
+
       voiceSessionActiveRef.current = false;
       voiceAwaitingResponseRef.current = false;
       setVoiceSessionActive(false);
       isListeningRef.current = false;
       setIsListening(false);
-      finishVoiceTurnRef.current?.();
-      recognitionRef.current.stop();
+      setIsTranscribingVoice(false);
+      if (recognitionRef.current) {
+        const pendingTranscript = [
+          voiceTurnTranscriptRef.current,
+          recognitionSegmentRef.current,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        if (pendingTranscript) {
+          finishVoiceTurnRef.current?.();
+        } else {
+          try {
+            recognitionRef.current.stop();
+          } catch (stopError) {
+            if (stopError.name !== "InvalidStateError") {
+              setError("O navegador não conseguiu encerrar a captura de voz.");
+            }
+          }
+        }
+      } else {
+        stopFallbackVoiceRef.current?.();
+      }
       return;
     }
 
@@ -664,19 +1415,22 @@ function App() {
       recognitionSegmentRef.current = "";
       voiceAwaitingResponseRef.current = false;
       setDraft("");
-      recognitionRef.current.lang = getSpeechLanguageCode(language);
+      setIsTranscribingVoice(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.lang = getSpeechLanguageCode(language);
+      }
       voiceSessionActiveRef.current = true;
       setVoiceSessionActive(true);
-      startRecognitionRef.current?.();
-      isListeningRef.current = true;
-      setIsListening(true);
-      setError("");
-    } catch {
+      await startRecognitionRef.current?.();
+    } catch (startError) {
       voiceSessionActiveRef.current = false;
       setVoiceSessionActive(false);
       isListeningRef.current = false;
       setIsListening(false);
-      setError("Seu microfone já está em uso ou não foi permitido.");
+      setError(
+        startError.message ||
+          "Seu microfone já está em uso ou não foi permitido.",
+      );
     }
   }
 
@@ -1137,16 +1891,25 @@ function App() {
                       className={`voice-button ${isListening ? "active" : ""}`}
                       type="button"
                       onClick={toggleVoiceMode}
-                      disabled={!voiceSupported || isSending}
+                      disabled={!voiceSupported}
+                      aria-pressed={voiceSessionActive}
                       aria-label={
-                        voiceSessionActive
+                        voiceSessionActive &&
+                        !hasSpeechRecognition &&
+                        isListening
+                          ? "Concluir fala e transcrever"
+                          : voiceSessionActive
                           ? "Encerrar conversa por voz"
                           : "Iniciar conversa por voz"
                       }
                     >
                       {voiceSessionActive
                         ? isListening
+                          ? hasSpeechRecognition
                           ? "● Ouvindo · encerrar"
+                          : "● Ouvindo · concluir fala"
+                          : isTranscribingVoice
+                          ? "Transcrevendo · encerrar"
                           : isSending
                             ? "Lia respondendo"
                             : "Conversa por voz ativa"
@@ -1169,8 +1932,8 @@ function App() {
                       <input
                         id="voice-speed"
                         type="range"
-                        min="0.5"
-                        max="1.5"
+                        min="0.7"
+                        max="1.2"
                         step="0.1"
                         value={voiceSpeed}
                         onChange={(event) =>
@@ -1266,6 +2029,76 @@ function App() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="assistant-settings">
+              <div className="sidebar-section-label">SEU ASSISTENTE</div>
+              <label htmlFor="chat-agent">Agente</label>
+              <select
+                id="chat-agent"
+                value={selectedAgent}
+                onChange={(event) => setSelectedAgent(event.target.value)}
+                disabled={!agents.length}
+              >
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="chat-personality">Personalidade</label>
+              <select
+                id="chat-personality"
+                value={selectedPersonality}
+                onChange={(event) => setSelectedPersonality(event.target.value)}
+                disabled={!personalities.length}
+              >
+                {personalities.map((personality) => (
+                  <option key={personality.id} value={personality.id}>
+                    {personality.name}
+                  </option>
+                ))}
+              </select>
+              {optionsError && (
+                <p className="assistant-settings-error" role="status">
+                  {optionsError}
+                </p>
+              )}
+              <label htmlFor="chat-voice">Voz ElevenLabs</label>
+              <select
+                id="chat-voice"
+                value={selectedVoiceId}
+                onChange={(event) => setSelectedVoiceId(event.target.value)}
+                disabled={voiceCatalogLoading || !elevenLabsVoices.length}
+              >
+                {elevenLabsVoices.map((voice) => (
+                  <option key={voice.voice_id} value={voice.voice_id}>
+                    {voice.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="voice-preview"
+                type="button"
+                onClick={() =>
+                  speakAssistantText(
+                    getSpeechPreviewText(language),
+                    undefined,
+                    true,
+                  )
+                }
+                disabled={voiceCatalogLoading || !selectedVoiceId}
+              >
+                Ouvir prévia
+              </button>
+              {voiceCatalogLoading && (
+                <p className="assistant-settings-status">Carregando vozes...</p>
+              )}
+              {voiceError && (
+                <p className="assistant-settings-error" role="status">
+                  {voiceError}
+                </p>
+              )}
             </div>
 
             <div className="coach-card">

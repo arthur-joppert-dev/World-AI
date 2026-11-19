@@ -3,13 +3,17 @@ import secrets
 import unicodedata
 from functools import wraps
 from datetime import datetime, timezone
+from itertools import chain
+from urllib.error import URLError
 
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, Response, current_app, jsonify, request, session
 from groq import APIConnectionError, APITimeoutError, APIStatusError, RateLimitError
 from sqlalchemy import or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from backend.ai.ai import ask, grade_written_answer
+from backend.ai.ai import ask, grade_written_answer, transcribe_audio
+from backend.ai.elevenlabs import ElevenLabsError, get_voices, stream_speech
+from backend.ai.profiles import CHAT_AGENTS, CHAT_LEVELS, CHAT_PERSONALITIES
 from backend import db
 from backend.models.models import (
     Atividade,
@@ -328,12 +332,33 @@ def serialize_jogo(jogo, participante=None):
 @bp.route("/ask", methods=["POST"])
 def askAi():
     data = get_json_object()
-    if not data or not data.get("cmd") or not data.get("ido"):
+    if (
+        not data
+        or not isinstance(data.get("cmd"), str)
+        or not data["cmd"].strip()
+        or len(data["cmd"]) > 40000
+        or not isinstance(data.get("ido"), str)
+        or not data["ido"].strip()
+        or len(data["ido"]) > 40
+    ):
         return jsonify({"error": "Invalid request"}), 400
     ido = data["ido"]
     cmd = data["cmd"]
+    agent_id = data.get("agent")
+    personality_id = data.get("personality")
+    level = data.get("level")
+    if agent_id is not None or personality_id is not None or level is not None:
+        if (
+            not isinstance(agent_id, str)
+            or agent_id not in CHAT_AGENTS
+            or not isinstance(personality_id, str)
+            or personality_id not in CHAT_PERSONALITIES
+            or not isinstance(level, str)
+            or level not in CHAT_LEVELS
+        ):
+            return jsonify({"error": "Selecione um agente, personalidade e nível válidos."}), 400
     try:
-        resp = ask(cmd, ido)
+        resp = ask(cmd, ido, agent_id, personality_id, level)
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 500
     except RateLimitError:
@@ -345,6 +370,129 @@ def askAi():
         "cmd": cmd,
         "ido": ido
     })
+
+
+@bp.route("/chat/options", methods=["GET"])
+def chat_options():
+    return jsonify(
+        {
+            "agents": [
+                {key: value for key, value in agent.items() if key != "instruction"}
+                | {"id": agent_id}
+                for agent_id, agent in CHAT_AGENTS.items()
+            ],
+            "personalities": [
+                {
+                    key: value
+                    for key, value in personality.items()
+                    if key != "instruction"
+                }
+                | {"id": personality_id}
+                for personality_id, personality in CHAT_PERSONALITIES.items()
+            ],
+        }
+    )
+
+
+@bp.route("/voice/voices", methods=["GET"])
+def elevenlabs_voices():
+    try:
+        return jsonify({"voices": get_voices()})
+    except ElevenLabsError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
+@bp.route("/voice/speech", methods=["POST"])
+def elevenlabs_speech():
+    data = get_json_object()
+    text = data.get("text") if data else None
+    voice_id = data.get("voice_id") if data else None
+    speed = data.get("speed", 0.95) if data else 0.95
+    if (
+        not isinstance(text, str)
+        or not text.strip()
+        or len(text) > 4000
+        or not isinstance(voice_id, str)
+        or not voice_id
+        or len(voice_id) > 200
+        or isinstance(speed, bool)
+        or not isinstance(speed, (int, float))
+        or not 0.7 <= speed <= 1.2
+    ):
+        return jsonify({"error": "Texto, voz ou velocidade inválidos."}), 400
+
+    try:
+        audio_stream = stream_speech(text.strip(), voice_id, speed)
+    except ElevenLabsError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+    try:
+        first_chunk = next(audio_stream)
+    except StopIteration:
+        return jsonify({"error": "O ElevenLabs não retornou áudio."}), 502
+    except (TimeoutError, URLError):
+        return jsonify({"error": "A transmissão de áudio foi interrompida. Tente novamente."}), 503
+    return Response(
+        chain((first_chunk,), audio_stream),
+        mimetype="audio/mpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@bp.route("/voice/transcribe", methods=["POST"])
+def transcribe_voice():
+    max_audio_size = 10 * 1024 * 1024
+    if request.content_length and request.content_length > max_audio_size + 64 * 1024:
+        return jsonify({"error": "O áudio excede o limite de 10 MB."}), 413
+
+    audio_file = request.files.get("audio")
+    language = request.form.get("language")
+    language_codes = {
+        "English": "en",
+        "Español": "es",
+        "Français": "fr",
+        "Deutsch": "de",
+        "Italiano": "it",
+        "Português": "pt",
+        "日本語": "ja",
+    }
+    if audio_file is None or language not in language_codes:
+        return jsonify({"error": "Áudio ou idioma inválido."}), 400
+    content_type = audio_file.mimetype.lower()
+    if content_type not in {
+        "audio/flac",
+        "audio/mp4",
+        "audio/mpeg",
+        "audio/mpga",
+        "audio/ogg",
+        "audio/wav",
+        "audio/webm",
+    }:
+        return jsonify({"error": "Formato de áudio não suportado."}), 400
+    audio = audio_file.read(max_audio_size + 1)
+    if not audio:
+        return jsonify({"error": "O áudio está vazio."}), 400
+    if len(audio) > max_audio_size:
+        return jsonify({"error": "O áudio excede o limite de 10 MB."}), 413
+
+    extension = content_type.removeprefix("audio/").replace("mpeg", "mp3")
+    try:
+        text = transcribe_audio(
+            audio,
+            f"voice.{extension}",
+            content_type,
+            language_codes[language],
+        )
+    except RateLimitError:
+        return jsonify({"error": "O serviço de voz está temporariamente sobrecarregado. Tente novamente."}), 429
+    except (APITimeoutError, APIConnectionError):
+        return jsonify({"error": "Não foi possível conectar ao serviço de reconhecimento de voz. Tente novamente."}), 503
+    except APIStatusError:
+        return jsonify({"error": "O serviço de reconhecimento de voz não conseguiu processar o áudio."}), 502
+
+    return jsonify({"text": text.strip() if isinstance(text, str) else ""})
 
 
 @bp.route("/games", methods=["POST"])

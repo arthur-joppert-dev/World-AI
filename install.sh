@@ -48,6 +48,16 @@ if [[ -z "$GROQ_API_KEY" || "$GROQ_API_KEY" == "your-groq-api-key" ]]; then
   printf 'GROQ_API_KEY=%s\n' "$GROQ_API_KEY" >>"$BACKEND_ENV"
 fi
 
+ELEVENLABS_API_KEY="$(read_env_value ELEVENLABS_API_KEY)"
+if [[ -z "$ELEVENLABS_API_KEY" || "$ELEVENLABS_API_KEY" == "your-elevenlabs-api-key" ]]; then
+  printf 'Informe a chave da API ElevenLabs para habilitar vozes (Enter para configurar depois): '
+  IFS= read -r -s ELEVENLABS_API_KEY
+  printf '\n'
+  if [[ -n "$ELEVENLABS_API_KEY" ]]; then
+    set_env_value ELEVENLABS_API_KEY "$ELEVENLABS_API_KEY"
+  fi
+fi
+
 FLASK_SECRET_KEY="$(read_env_value FLASK_SECRET_KEY)"
 if [[ -z "$FLASK_SECRET_KEY" || "$FLASK_SECRET_KEY" == "replace-with-a-long-random-secret" ]]; then
   FLASK_SECRET_KEY="$(openssl rand -hex 32)"
@@ -62,7 +72,7 @@ if [[ -z "$ADMIN_API_KEY" ]]; then
 fi
 
 chmod 600 "$BACKEND_ENV"
-unset GROQ_API_KEY FLASK_SECRET_KEY ADMIN_API_KEY
+unset GROQ_API_KEY ELEVENLABS_API_KEY FLASK_SECRET_KEY ADMIN_API_KEY
 
 DOMAIN=""
 if [[ -f "$DOMAIN_ENV" ]]; then

@@ -5,6 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from groq import Groq
 
+from backend.ai.profiles import build_chat_system_prompt
+
 path = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=path)
 API_KEY = (os.getenv("GROQ_API_KEY") or "").strip()
@@ -15,17 +17,40 @@ if not API_KEY:
 client = Groq(api_key=API_KEY, timeout=30.0, max_retries=1)
 
 
-def ask(txt, ido):
+def ask(txt, ido, agent_id=None, personality_id=None, level=None):
+    messages = []
+    if agent_id is not None:
+        messages.append(
+            {
+                "role": "system",
+                "content": build_chat_system_prompt(
+                    agent_id,
+                    personality_id,
+                    ido,
+                    level,
+                ),
+            }
+        )
+    messages.append(
+        {
+            "role": "user",
+            "content": txt if agent_id is not None else f"'{txt}'. Responda em {ido}",
+        }
+    )
     completion = client.chat.completions.create(
         model="openai/gpt-oss-120b",
-        messages=[
-            {
-                "role": "user",
-                "content": f"'{txt}'. Responda em {ido}",
-            }
-        ],
+        messages=messages,
     )
     return completion.choices[0].message.content
+
+
+def transcribe_audio(audio, filename, content_type, language):
+    transcription = client.audio.transcriptions.create(
+        file=(filename, audio, content_type),
+        model="whisper-large-v3-turbo",
+        language=language,
+    )
+    return transcription.text
 
 
 def grade_written_answer(question, accepted_answers, student_answer, language):

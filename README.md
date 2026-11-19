@@ -4,7 +4,10 @@
 
 Pré-requisitos: Docker com o plugin Docker Compose.
 
-1. Copie `backend/.env.example` para `backend/.env` e informe sua chave `GROQ_API_KEY` e uma chave secreta em `ADMIN_API_KEY`.
+1. Copie `backend/.env.example` para `backend/.env` e configure `GROQ_API_KEY`,
+   `ELEVENLABS_API_KEY` e uma chave secreta em `ADMIN_API_KEY`. A chave ElevenLabs
+   é necessária para listar vozes e gerar áudio; o chat de texto continua usando
+   Groq.
 2. Na raiz do projeto, execute:
 
    ```sh
@@ -18,6 +21,23 @@ mantido em `instance/` no host, e o arquivo `backend/.env` é usado apenas para
 fornecer variáveis ao container, sem ser incluído na imagem. Para encerrar, use
 `docker compose down`.
 
+Na conversa, escolha um agente, uma personalidade e uma voz ElevenLabs no painel
+lateral. A voz selecionada e as preferências ficam salvas no navegador. Se você
+alterar `backend/.env`, recrie o backend para carregar as novas variáveis:
+
+```sh
+sudo docker compose up -d --force-recreate backend
+```
+
+No Firefox, a conversa por voz usa a gravação de áudio do navegador e a
+transcrição do Groq (`GROQ_API_KEY`); o áudio é enviado ao backend para
+reconhecimento e não é salvo pelo aplicativo. Depois de enviar uma mensagem
+falada, o microfone fica desligado até você iniciar outra sessão manualmente.
+Permita o acesso ao microfone e use `localhost` ou HTTPS. Se a pausa automática
+não detectar o fim da fala, toque em **Concluir fala** para enviar a gravação.
+A resposta de voz usa o modelo ElevenLabs Flash e começa a tocar enquanto o
+áudio ainda está sendo transmitido.
+
 ## Publicar em um VPS Hostinger
 
 O instalador de produção requer um VPS com Ubuntu ou Debian; hospedagem
@@ -28,8 +48,10 @@ compartilhada não executa estes containers Docker.
 2. Conecte-se ao VPS por SSH, clone este repositório e entre na pasta do projeto.
 3. Execute `chmod +x install.sh` e depois `sudo ./install.sh`.
 4. Se a chave Groq ainda não estiver configurada, informe-a quando solicitado.
-   O instalador gera a chave administrativa e o segredo de sessão, solicita o
-   domínio e salva as configurações localmente sem exibir os segredos.
+   Informe também a chave ElevenLabs para habilitar as vozes, ou pressione Enter
+   para configurar o recurso depois. O instalador gera a chave administrativa
+   e o segredo de sessão, solicita o domínio e salva as configurações localmente
+   sem exibir os segredos.
 5. Acesse `https://seu-dominio`. O Caddy solicita e renova o certificado HTTPS
    automaticamente quando o DNS e as portas estiverem configurados.
 

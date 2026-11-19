@@ -457,6 +457,52 @@ html {
   color: #97a29b;
   font-size: 10px;
 }
+.assistant-settings {
+  display: grid;
+  gap: 7px;
+  margin-top: 23px;
+}
+.assistant-settings .sidebar-section-label {
+  margin: 0 0 3px;
+}
+.assistant-settings label {
+  margin-top: 3px;
+  color: #61749b;
+  font:
+    600 10px "DM Sans",
+    sans-serif;
+}
+.assistant-settings select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid #dfe8df;
+  border-radius: 8px;
+  color: #40544b;
+  background: #fbfcfa;
+  font:
+    500 10px "DM Sans",
+    sans-serif;
+}
+.assistant-settings select:disabled {
+  opacity: 0.65;
+}
+.assistant-settings .voice-preview {
+  width: 100%;
+}
+.assistant-settings-status,
+.assistant-settings-error {
+  margin: 1px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.assistant-settings-status {
+  color: #7e8fb4;
+}
+.assistant-settings-error {
+  color: #a44c38;
+}
 .active-dot,
 .status-dot,
 .live-indicator {
@@ -1056,6 +1102,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 11px;
+  flex-wrap: wrap;
 }
 .character-count {
   color: #b0b8b1;
@@ -1065,9 +1112,11 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .voice-button,
-.voice-toggle {
+.voice-toggle,
+.voice-preview {
   padding: 7px 9px;
   border: 1px solid #dfe8df;
   border-radius: 8px;
@@ -1078,6 +1127,16 @@ h1 {
     sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+.voice-preview {
+  color: #2349a9;
+  background: #edf4ff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.voice-preview:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .voice-button.active {
   color: #fff;
@@ -1942,9 +2001,11 @@ html[data-theme="dark"] .translator-close-button:hover {
 
 html[data-theme="dark"] .shortcut,
 html[data-theme="dark"] .session-card,
+html[data-theme="dark"] .assistant-settings select,
 html[data-theme="dark"] .message-row.user .message-bubble,
 html[data-theme="dark"] .voice-button,
 html[data-theme="dark"] .voice-toggle,
+html[data-theme="dark"] .voice-preview,
 html[data-theme="dark"] .translator-direction-select,
 html[data-theme="dark"] .translator-dialog textarea {
   border-color: #34415a;
@@ -1953,6 +2014,7 @@ html[data-theme="dark"] .translator-dialog textarea {
 }
 
 html[data-theme="dark"] .session-card strong,
+html[data-theme="dark"] .assistant-settings label,
 html[data-theme="dark"] .message-author,
 html[data-theme="dark"] .message-bubble,
 html[data-theme="dark"] .suggestion-chip,
@@ -1966,6 +2028,7 @@ html[data-theme="dark"] .translator-result p {
 }
 
 html[data-theme="dark"] .conversation-heading p,
+html[data-theme="dark"] .assistant-settings-status,
 html[data-theme="dark"] .conversation-status,
 html[data-theme="dark"] .session-title,
 html[data-theme="dark"] .session-card small,
@@ -1981,6 +2044,10 @@ html[data-theme="dark"] .translator-result span,
 html[data-theme="dark"] .translator-dialog textarea::placeholder,
 html[data-theme="dark"] .composer textarea::placeholder {
   color: #8997ae;
+}
+
+html[data-theme="dark"] .assistant-settings-error {
+  color: #ffad98;
 }
 
 html[data-theme="dark"] .conversation-heading,
